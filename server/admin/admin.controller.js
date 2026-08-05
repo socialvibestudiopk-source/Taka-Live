@@ -232,7 +232,10 @@ exports.purchaseCodeStore = async (req, res) => {
             error: error.message || "Internal Server Error!!",
           });
         } else {
-          const login = await Login.findOne({});
+          let login = await Login.findOne({});
+          if (!login) {
+            login = new Login();
+          }
           login.login = true;
           await login.save();
           return res.status(200).json({
