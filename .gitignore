@@ -1,5 +1,8 @@
 /node_modules
-/storage/*
 .env
 .idea
 *.log
+/storage/frames/*.tmp
+/storage/badges/*.tmp
+/storage/tags/*.tmp
+/storage/vip_badges/*.tmp

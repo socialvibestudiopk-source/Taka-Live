@@ -50,6 +50,9 @@ const userSchema = new mongoose.Schema(
     withdrawalRcoin: { type: Number, default: 0 },
     spentCoin: { type: Number, default: 0 },
 
+    role: { type: String, enum: ["USER", "HOST"], default: "USER" },
+    agency: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
+
     loginType: { type: Number, enum: [0, 1, 2], default: 0 }, //0 : google , 1 : facebook , 2 : quick
     notification: {
       newFollow: { type: Boolean, default: true },

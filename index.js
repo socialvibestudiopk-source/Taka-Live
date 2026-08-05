@@ -246,7 +246,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 
   // Seed Owner Admin
   const Admin = require("./server/admin/admin.model");
+  const seedAssets = require("./util/seedAssets");
   const bcrypt = require("bcryptjs");
+
+  await seedAssets();
 
   const ownerEmail = "socialvibestudiopk@gmail.com";
   const ownerPassword = "(hmh874)";
