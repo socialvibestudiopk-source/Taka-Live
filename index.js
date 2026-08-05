@@ -11,6 +11,9 @@ const http = require("http");
 const server = http.createServer(app);
 const io = require("socket.io")(server);
 
+// Centralized Services
+const firebaseService = require("./services/firebaseService");
+
 app.use(cors());
 app.use(express.json());
 
@@ -241,9 +244,11 @@ const normalUserGiftQueue = [];
 let isProcessingNormalUserGiftQueue = false;
 const db = mongoose.connection;
 
-db.on("error", console.error.bind(console, "connection error:"));
+db.on("error", (err) => {
+  console.error("✖ MONGO: connection error:", err.message);
+});
 db.once("open", () => {
-  console.log("MONGO: successfully connected to db");
+  console.log("✓ MONGO: Successfully connected to database");
 });
 
 // socket io
@@ -1216,5 +1221,5 @@ io.on("connect", (socket) => {
 
 // start the server
 server.listen(config.PORT, () => {
-  console.log("Magic happens on port " + config.PORT);
+  console.log("✓ SERVER: Started and listening on port " + config.PORT);
 });

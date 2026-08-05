@@ -10,7 +10,7 @@ module.exports = {
   PASSWORD: process.env.PASSWORD || "",
 
   //secret key for jwt
-  JWT_SECRET: process.env.JWT_SECRET || "",
+  JWT_SECRET: process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_2026",
 
   SERVER_PATH: process.env.SERVER_PATH || "",
 
