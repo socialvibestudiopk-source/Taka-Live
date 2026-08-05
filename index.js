@@ -30,21 +30,7 @@ const ChatTopic = require("./server/chatTopic/chatTopic.model");
 const LiveStreamingHistory = require("./server/liveStreamingHistory/liveStreamingHistory.model");
 
 //FCM node
-var fcm;
-if (config.SERVER_KEY) {
-  var FCM = require("fcm-node");
-  fcm = new FCM(config.SERVER_KEY);
-} else {
-  console.warn(
-    "WARNING: config.SERVER_KEY is missing. Notifications will not be sent."
-  );
-  fcm = {
-    send: (payload, callback) => {
-      console.warn("FCM: send called but SERVER_KEY is missing.");
-      if (callback) callback(new Error("SERVER_KEY missing"), null);
-    },
-  };
-}
+const fcm = require("./util/fcm");
 
 //admin route
 const AdminRoute = require("./server/admin/admin.route");

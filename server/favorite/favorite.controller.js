@@ -5,9 +5,7 @@ const Video = require("../video/video.model");
 const dayjs = require("dayjs");
 
 //FCM node
-var FCM = require("fcm-node");
-var config = require("../../config");
-var fcm = new FCM(config.SERVER_KEY);
+const fcm = require("../../util/fcm");
 
 //like or unlike post and video
 exports.likeUnlike = async (req, res, next) => {

@@ -4,9 +4,7 @@ const fs = require("fs");
 const { compressImage } = require("../../util/compressImage");
 
 //FCM node
-var FCM = require("fcm-node");
-var config = require("../../config");
-var fcm = new FCM(config.SERVER_KEY);
+const fcm = require("../../util/fcm");
 
 // get old chat
 exports.getOldChat = async (req, res) => {

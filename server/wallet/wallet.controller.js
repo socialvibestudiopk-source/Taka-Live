@@ -5,9 +5,7 @@ const LiveStreamingHistory = require("../liveStreamingHistory/liveStreamingHisto
 const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
 
 //FCM node
-var FCM = require("fcm-node");
-var config = require("../../config");
-var fcm = new FCM(config.SERVER_KEY);
+const fcm = require("../../util/fcm");
 
 const addFieldQuery = {
   analyticDate: { $arrayElemAt: [{ $split: ["$date", ", "] }, 0] },

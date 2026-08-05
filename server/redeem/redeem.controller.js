@@ -3,10 +3,8 @@ const User = require("../user/user.model");
 const Wallet = require("../wallet/wallet.model");
 const dayjs = require("dayjs");
 
-//FCM
-var FCM = require("fcm-node");
-var { SERVER_KEY } = require("../../config");
-var fcm = new FCM(SERVER_KEY);
+//FCM node
+const fcm = require("../../util/fcm");
 
 // get redeem list [frontend]
 exports.index = async (req, res) => {

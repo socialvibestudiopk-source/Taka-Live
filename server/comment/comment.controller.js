@@ -6,9 +6,7 @@ const dayjs = require("dayjs");
 const mongoose = require("mongoose");
 
 //FCM node
-var FCM = require("fcm-node");
-var config = require("../../config");
-var fcm = new FCM(config.SERVER_KEY);
+const fcm = require("../../util/fcm");
 
 //create comment
 exports.store = async (req, res) => {

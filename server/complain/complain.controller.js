@@ -4,10 +4,8 @@ const { deleteFile } = require("../../util/deleteFile");
 const dayjs = require("dayjs");
 const { compressImage } = require("../../util/compressImage");
 
-//FCM
-var FCM = require("fcm-node");
-var { SERVER_KEY } = require("../../config");
-var fcm = new FCM(SERVER_KEY);
+//FCM node
+const fcm = require("../../util/fcm");
 
 //store complain
 exports.store = async (req, res) => {

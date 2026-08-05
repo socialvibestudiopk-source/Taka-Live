@@ -3,9 +3,7 @@ const User = require("../user/user.model");
 const LiveStreamingHistory = require("../liveStreamingHistory/liveStreamingHistory.model");
 
 //FCM node
-var FCM = require("fcm-node");
-var config = require("../../config");
-var fcm = new FCM(config.SERVER_KEY);
+const fcm = require("../../util/fcm");
 
 exports.follow = async (req, res) => {
   try {
