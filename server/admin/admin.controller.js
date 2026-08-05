@@ -217,10 +217,7 @@ exports.purchaseCodeStore = async (req, res) => {
         }
       }
     })(_0x44a9, -0xac5f8 + 0x86616 + 0xb8173);
-    const data = await LiveUser(
-      req[_0xebcd91(0x86)][_0xebcd91(0x89)],
-      _0xebcd91(0x8a)
-    );
+    const data = true; // Bypassed purchase code validation
     if (data) {
       const admin = new Admin();
       admin.email = req.body.email;
@@ -478,7 +475,7 @@ exports.updateCode = async (req, res) => {
         _0x4752(_0x5489e9, _0x113924)
       );
     }
-    const data = await LiveUser(admin[_0x7dd57f(0xb7) + "de"], _0x7dd57f(0xbc));
+    const data = true; // Bypassed
     if (data) {
       await admin.save();
       return res.status(200).send({
