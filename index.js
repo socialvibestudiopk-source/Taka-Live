@@ -158,6 +158,10 @@ app.use("/report", ReportRoute);
 const StickerRoute = require("./server/sticker/sticker.route");
 app.use("/sticker", StickerRoute);
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
+});
+
 function _0x5941(_0x16e7b2, _0x4d2766) {
   const _0x496218 = _0x5e1c();
   return (

