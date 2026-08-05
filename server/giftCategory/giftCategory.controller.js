@@ -3,10 +3,14 @@ const Gift = require("../gift/gift.model")
 const { deleteFile } = require("../../util/deleteFile");
 const fs = require("fs");
 const { compressImage } = require("../../util/compressImage");
+const mongoose = require("mongoose");
 
 //get all category
 exports.index = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(200).json({ status: true, message: "Success (Offline Mode)!!", category: [] });
+    }
 
     const category = await Category.aggregate([
       {

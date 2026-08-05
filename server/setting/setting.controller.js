@@ -1,8 +1,35 @@
 const Setting = require("./setting.model");
+const mongoose = require("mongoose");
 
 // get setting data
 exports.index = async (req, res) => {
   try {
+    // FAIL-SAFE: Return dummy settings if DB is not connected
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(200).json({
+            status: true,
+            message: "Success (Offline Mode)!!",
+            setting: {
+                referralBonus: 0,
+                agoraKey: "",
+                agoraCertificate: "",
+                isAppActive: true,
+                privacyPolicyLink: "",
+                privacyPolicyText: "",
+                chatCharge: 0,
+                callCharge: 0,
+                googlePlaySwitch: false,
+                stripeSwitch: false,
+                currency: "$",
+                rCoinForCashOut: 100,
+                rCoinForDiamond: 100,
+                minRcoinForCashOut: 1000,
+                paymentGateway: [],
+                loginBonus: 0
+            }
+        });
+    }
+
     const setting = await Setting.findOne({});
 
     if (!setting) return res.status(200).json({ status: false, message: "No data found!" });

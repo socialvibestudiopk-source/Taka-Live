@@ -158,6 +158,22 @@ app.use("/report", ReportRoute);
 const StickerRoute = require("./server/sticker/sticker.route");
 app.use("/sticker", StickerRoute);
 
+// frame route
+const FrameRoute = require("./server/frame/frame.route");
+app.use("/frame", FrameRoute);
+
+// badge route
+const BadgeRoute = require("./server/badge/badge.route");
+app.use("/badge", BadgeRoute);
+
+// tag route
+const TagRoute = require("./server/tag/tag.route");
+app.use("/tag", TagRoute);
+
+// agency route
+const AgencyRoute = require("./server/agency/agency.route");
+app.use("/agency", AgencyRoute);
+
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
 });

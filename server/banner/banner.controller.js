@@ -2,10 +2,14 @@ const Banner = require("./banner.model");
 const { deleteFile } = require("../../util/deleteFile");
 const fs = require("fs");
 const { compressImage } = require("../../util/compressImage");
+const mongoose = require("mongoose");
 
 // get VIP and normal banner [android]
 exports.getBanner = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(200).json({ status: true, message: "Success (Offline Mode)!!", banner: [] });
+    }
     if (!req.query.type)
       return res
         .status(200)

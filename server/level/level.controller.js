@@ -2,9 +2,13 @@ const Level = require("./level.model");
 const fs = require("fs");
 const { deleteFile } = require("../../util/deleteFile")
 const { compressImage } = require("../../util/compressImage");
+const mongoose = require("mongoose");
 
 exports.index = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(200).json({ status: true, message: "Success (Offline Mode)!!", level: [] });
+    }
     const level = await Level.find().sort({
       coin: -1,
     });

@@ -922,6 +922,33 @@ const updateLevel = async (userId, res) => {
   }
 };
 
+// update user role
+exports.updateRole = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+
+    if (!user) {
+      return res.status(200).json({ status: false, message: "User does not Exist!!" });
+    }
+
+    user.role = req.body.role;
+    if (req.body.agency) {
+        user.agency = req.body.agency;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      status: true,
+      message: "Role updated successfully!",
+      user,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ status: false, error: error.message || "Server Error" });
+  }
+};
+
 exports.IdGenerate = async (req, res) => {
   try {
     const user = await User.find({});

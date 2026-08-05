@@ -76,6 +76,13 @@ router.patch(
   UserController.blockUnblock
 );
 
+// update user role
+router.patch(
+  "/user/updateRole/:userId",
+  checkAccessWithKey(),
+  UserController.updateRole
+);
+
 router.patch("/IdGenerate", checkAccessWithKey(), UserController.IdGenerate);
 
 module.exports = router;
