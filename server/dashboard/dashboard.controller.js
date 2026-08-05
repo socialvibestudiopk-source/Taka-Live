@@ -7,6 +7,11 @@ const Post = require("../post/post.model");
 const Video = require("../video/video.model");
 const VIPPlan = require("../vipPlan/vipPlan.model");
 const CoinPlan = require("../coinPlan/coinPlan.model");
+const Room = require("../room/room.model");
+const Agency = require("../agency/agency.model");
+const Withdraw = require("../withdraw/withdraw.model");
+const Recharge = require("../recharge/recharge.model");
+const Admin = require("../admin/admin.model");
 
 exports.dashboard = async (req, res) => {
   try {
@@ -17,6 +22,13 @@ exports.dashboard = async (req, res) => {
     const post = await Post.find().countDocuments();
     const video = await Video.find().countDocuments();
     const report = await Report.find().countDocuments();
+
+    // Enterprise Stats
+    const totalRoom = await Room.find().countDocuments();
+    const totalAgency = await Agency.find().countDocuments();
+    const totalBD = await Admin.find({ role: "BD" }).countDocuments();
+    const pendingWithdraw = await Withdraw.find({ status: 0 }).countDocuments();
+    const pendingRecharge = await Recharge.find({ status: 0 }).countDocuments();
 
     // coin plan revenue
     const coinRevenue = await CoinPlan.aggregate([
@@ -91,6 +103,11 @@ exports.dashboard = async (req, res) => {
       post,
       video,
       report,
+      totalRoom,
+      totalAgency,
+      totalBD,
+      pendingWithdraw,
+      pendingRecharge,
       revenue: {
         dollar:
           (coinRevenue.length > 0 ? coinRevenue[0].dollar : 0) +

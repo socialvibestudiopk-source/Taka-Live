@@ -39,11 +39,24 @@ const userSchema = new mongoose.Schema(
     video: { type: Number, default: 0 },
     post: { type: Number, default: 0 },
 
+    // Enterprise Enterprise Fields
+    role: { type: String, enum: ["USER", "HOST", "AGENCY_OWNER", "BD"], default: "USER" },
+    agencyId: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
+    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null }, // Link to BD (Admin role)
+
     level: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Level",
       default: null,
     },
+    xp: { type: Number, default: 0 },
+
+    frame: { type: mongoose.Schema.Types.ObjectId, ref: "Frame", default: null },
+    tag: { type: mongoose.Schema.Types.ObjectId, ref: "Tag", default: null },
+    badges: [{ type: mongoose.Schema.Types.ObjectId, ref: "Badge" }],
+    currentEntranceEffect: { type: String, default: null },
+    currentBubble: { type: String, default: null },
+
     uniqueId: Number,
     diamond: { type: Number, default: 0 },
     rCoin: { type: Number, default: 0 },

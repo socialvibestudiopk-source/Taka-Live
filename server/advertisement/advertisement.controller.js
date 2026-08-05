@@ -98,7 +98,17 @@ exports.googleAd = async (req, res) => {
     const ad = await Advertisement.findOne({});
 
     if (!ad) {
-      return res.status(200).json({ status: false, message: "Data not Found!" });
+      return res.status(200).json({
+        status: true,
+        message: "Offline Mode",
+        advertisement: {
+            native: "ca-app-pub-3940256099942544/2247696110",
+            reward: "ca-app-pub-3940256099942544/5224354917",
+            interstitial: "ca-app-pub-3940256099942544/1033173712",
+            banner: "ca-app-pub-3940256099942544/6300978111",
+            show: false
+        }
+      });
     }
 
     return res.status(200).json({
