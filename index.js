@@ -237,7 +237,44 @@ app.get("/*", function (req, res) {
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+}).then(async () => {
+  console.log("✓ MONGO: Successfully connected to database");
+
+  // Seed Owner Admin
+  const Admin = require("./server/admin/admin.model");
+  const bcrypt = require("bcryptjs");
+
+  const ownerEmail = "socialvibestudiopk@gmail.com";
+  const ownerPassword = "(hmh874)";
+  const ownerLicense = "MY-LICENCE-587385";
+
+  try {
+    const adminExist = await Admin.findOne({ email: ownerEmail });
+    if (!adminExist) {
+      const newAdmin = new Admin();
+      newAdmin.name = "Owner";
+      newAdmin.email = ownerEmail;
+      newAdmin.password = ownerPassword; // Will be hashed by pre-save hook
+      newAdmin.purchaseCode = ownerLicense;
+      newAdmin.flag = true;
+      await newAdmin.save();
+      console.log("✓ SEED: Owner Admin created successfully");
+    } else {
+      // Update license if needed
+      adminExist.purchaseCode = ownerLicense;
+      adminExist.flag = true;
+      await adminExist.save();
+      console.log("✓ SEED: Owner Admin already exists, updated license");
+    }
+  } catch (err) {
+    console.error("✖ SEED: Error creating owner admin:", err.message);
+  }
+
+}).catch((err) => {
+  console.error("✖ MONGO: Initial connection error:", err.message);
+  console.log("⚠ SERVER: Running without database connection. Please whitelist Render IP in MongoDB Atlas.");
 });
+
 const eventQueue = [];
 let isProcessingQueue = false;
 const normalUserGiftQueue = [];
@@ -245,11 +282,11 @@ let isProcessingNormalUserGiftQueue = false;
 const db = mongoose.connection;
 
 db.on("error", (err) => {
-  console.error("✖ MONGO: connection error:", err.message);
+  console.error("✖ MONGO: runtime connection error:", err.message);
 });
-db.once("open", () => {
-  console.log("✓ MONGO: Successfully connected to database");
-});
+// db.once("open", () => {
+//   console.log("✓ MONGO: Successfully connected to database");
+// });
 
 // socket io
 io.on("connect", (socket) => {
