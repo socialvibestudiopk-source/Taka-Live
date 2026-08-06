@@ -30,9 +30,29 @@ exports.index = async (req, res) => {
         });
     }
 
-    const setting = await Setting.findOne({});
+    let setting = await Setting.findOne({});
 
-    if (!setting) return res.status(200).json({ status: false, message: "No data found!" });
+    if (!setting) {
+        // Create default setting if none exists
+        setting = new Setting();
+        setting.referralBonus = 0;
+        setting.agoraKey = "";
+        setting.agoraCertificate = "";
+        setting.isAppActive = true;
+        setting.privacyPolicyLink = "";
+        setting.privacyPolicyText = "";
+        setting.chatCharge = 0;
+        setting.callCharge = 0;
+        setting.googlePlaySwitch = false;
+        setting.stripeSwitch = false;
+        setting.currency = "$";
+        setting.rCoinForCashOut = 100;
+        setting.rCoinForDiamond = 100;
+        setting.minRcoinForCashOut = 1000;
+        setting.paymentGateway = [];
+        setting.loginBonus = 0;
+        await setting.save();
+    }
 
     return res.status(200).json({ status: true, message: "Success!!", setting })
   } catch (error) {
