@@ -182,6 +182,10 @@ app.use("/withdraw", WithdrawRoute);
 const RechargeRoute = require("./server/recharge/recharge.route");
 app.use("/recharge", RechargeRoute);
 
+// auditLog route
+const AuditLogRoute = require("./server/auditLog/auditLog.route");
+app.use("/auditLog", AuditLogRoute);
+
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
 });

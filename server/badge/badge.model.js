@@ -2,9 +2,10 @@ const mongoose = require("mongoose");
 
 const badgeSchema = new mongoose.Schema(
   {
-    image: String,
     name: { type: String, default: "" },
-    type: { type: Number, enum: [0, 1], default: 0 }, // 0: Normal, 1: VIP
+    image: { type: String, default: "" },
+    type: { type: String, enum: ["role", "achievement", "event"], default: "achievement" },
+    is_active: { type: Boolean, default: true },
   },
   {
     timestamps: true,

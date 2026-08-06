@@ -2,8 +2,9 @@ const mongoose = require("mongoose");
 
 const tagSchema = new mongoose.Schema(
   {
-    image: String,
     name: { type: String, default: "" },
+    image: { type: String, default: "" },
+    is_active: { type: Boolean, default: true },
   },
   {
     timestamps: true,

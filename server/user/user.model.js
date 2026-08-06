@@ -39,10 +39,10 @@ const userSchema = new mongoose.Schema(
     video: { type: Number, default: 0 },
     post: { type: Number, default: 0 },
 
-    // Enterprise Enterprise Fields
-    role: { type: String, enum: ["USER", "HOST", "AGENCY_OWNER", "BD"], default: "USER" },
+    // Enterprise Owner Panel Extensions
+    role: { type: String, enum: ["owner", "super_admin", "admin", "agency", "bd", "coins_seller", "manager", "host", "user"], default: "user" },
     agencyId: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
-    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null }, // Link to BD (Admin role)
+    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
 
     level: {
       type: mongoose.Schema.Types.ObjectId,
@@ -57,14 +57,11 @@ const userSchema = new mongoose.Schema(
     currentEntranceEffect: { type: String, default: null },
     currentBubble: { type: String, default: null },
 
-    uniqueId: Number,
+    uniqueId: { type: Number, unique: true },
     diamond: { type: Number, default: 0 },
     rCoin: { type: Number, default: 0 },
     withdrawalRcoin: { type: Number, default: 0 },
     spentCoin: { type: Number, default: 0 },
-
-    role: { type: String, enum: ["USER", "HOST"], default: "USER" },
-    agency: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
 
     loginType: { type: Number, enum: [0, 1, 2], default: 0 }, //0 : google , 1 : facebook , 2 : quick
     notification: {
