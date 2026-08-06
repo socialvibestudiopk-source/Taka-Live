@@ -22,6 +22,20 @@ const seedAssets = async () => {
       console.log("✓ SEED: Frames seeded successfully");
     }
 
+    // Seed New Frames
+    const newFrameDir = path.join(storagePath, "new_frames");
+    if (fs.existsSync(newFrameDir)) {
+      const files = fs.readdirSync(newFrameDir);
+      for (const file of files) {
+        const frameExist = await Frame.findOne({ image: "storage/new_frames/" + file });
+        if (!frameExist) {
+          const newFrame = new Frame({ image: "storage/new_frames/" + file, name: "New " + file.split(".")[0] });
+          await newFrame.save();
+        }
+      }
+      console.log("✓ SEED: New Frames seeded successfully");
+    }
+
     // Seed Badges
     const badgeDir = path.join(storagePath, "badges");
     if (fs.existsSync(badgeDir)) {

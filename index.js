@@ -174,6 +174,14 @@ app.use("/tag", TagRoute);
 const AgencyRoute = require("./server/agency/agency.route");
 app.use("/agency", AgencyRoute);
 
+// withdraw route
+const WithdrawRoute = require("./server/withdraw/withdraw.route");
+app.use("/withdraw", WithdrawRoute);
+
+// recharge route
+const RechargeRoute = require("./server/recharge/recharge.route");
+app.use("/recharge", RechargeRoute);
+
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
 });
