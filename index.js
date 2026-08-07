@@ -39,6 +39,10 @@ const fcm = require("./util/fcm");
 const AdminRoute = require("./server/admin/admin.route");
 app.use("/admin", AdminRoute);
 
+// owner route
+const OwnerRoute = require("./server/owner/owner.route");
+app.use("/owner", OwnerRoute);
+
 //banner route
 const BannerRoute = require("./server/banner/banner.route");
 app.use("/banner", BannerRoute);
@@ -291,15 +295,17 @@ mongoose.connect(process.env.MONGODB_URI, {
       newAdmin.email = ownerEmail;
       newAdmin.password = ownerPassword; // Will be hashed by pre-save hook
       newAdmin.purchaseCode = ownerLicense;
+      newAdmin.role = "OWNER";
       newAdmin.flag = true;
       await newAdmin.save();
       console.log("✓ SEED: Owner Admin created successfully");
     } else {
-      // Update license if needed
+      // Update license and role if needed
       adminExist.purchaseCode = ownerLicense;
+      adminExist.role = "OWNER";
       adminExist.flag = true;
       await adminExist.save();
-      console.log("✓ SEED: Owner Admin already exists, updated license");
+      console.log("✓ SEED: Owner Admin already exists, updated license and role");
     }
   } catch (err) {
     console.error("✖ SEED: Error creating owner admin:", err.message);

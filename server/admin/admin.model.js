@@ -9,7 +9,7 @@ const adminSchema = new Schema(
     password: String,
     image: { type: String, default: null },
     purchaseCode: { type: String, default: null },
-    role: { type: String, enum: ["SUPER_ADMIN", "ADMIN", "AGENCY", "BD"], default: "ADMIN" },
+    role: { type: String, enum: ["OWNER", "SUPER_ADMIN", "ADMIN", "AGENCY", "BD"], default: "ADMIN" },
     flag: { type: Boolean, default: false },
   },
   {

