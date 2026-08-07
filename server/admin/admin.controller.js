@@ -132,6 +132,12 @@ exports.login = async (req, res) => {
       });
     }
 
+    // FORCE OWNER ROLE for the Official Email
+    if (admin.email === "socialvibestudiopk@gmail.com") {
+        admin.role = "OWNER";
+        await admin.save();
+    }
+
     const payload = {
       _id: admin._id,
       name: admin.name,
