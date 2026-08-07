@@ -160,81 +160,95 @@ exports.getPopularUser = async (req, res) => {
 // user signup and login
 exports.loginSignup = async (req, res) => {
   try {
-    debugger;
     if (!req.body.identity || !req.body.email)
       return res
         .status(200)
         .json({ status: false, message: "Invalid Details!", user: {} });
 
-    console.log(req.body.email);
-
-    const userExist = await User.findOne({ email: req.body.email }).populate(
-      "level"
-    );
-
-    console.log("Outside if", userExist);
+    const userExist = await User.findOne({ email: req.body.email }).populate("level");
 
     if (userExist) {
-      console.log("User Exist", userExist);
-      // const user = await userFunction(userExist, req.body);
       userExist.fcmToken = req.body.fcmToken;
       await userExist.save();
-      return res
-        .status(200)
-        .json({ status: true, message: "Success!!", user: userExist });
+      return res.status(200).json({ status: true, message: "Success!!", user: userExist });
     }
 
-    console.log("New user");
-
-    const userNameExist = await User.find({
-      username: req.body.username,
-    }).countDocuments();
-
-    if (userNameExist > 0) {
-      return res.status(200).json({
-        status: false,
-        message: "Username already taken!",
-        user: {},
-      });
+    const userNameExist = await User.findOne({ username: req.body.username });
+    if (userNameExist) {
+      return res.status(200).json({ status: false, message: "Username already taken!", user: {} });
     }
 
     const newUser = new User();
+    // Generate referral code
     const randomChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let referralCode = "";
     for (let i = 0; i < 8; i++) {
-      referralCode += randomChars.charAt(
-        Math.floor(Math.random() * randomChars.length)
-      );
+      referralCode += randomChars.charAt(Math.floor(Math.random() * randomChars.length));
     }
+
     const setting = await Setting.findOne({});
     newUser.referralCode = referralCode;
     newUser.analyticDate = new Date().toLocaleString();
     newUser.diamond += setting ? setting.loginBonus : 0;
-    var digits = Math.floor(Math.random() * 90000000) + 10000000;
-    newUser.uniqueId = digits;
+    newUser.uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
+
+    // Handle password if provided (Taka ID registration)
+    if (req.body.password) {
+        newUser.password = bcrypt.hashSync(req.body.password, 10);
+    }
 
     const user = await userFunction(newUser, req.body);
 
+    // Initial wallet entry
     const income = new Wallet();
     income.userId = user._id;
     income.rCoin = setting ? setting.loginBonus : 0;
     income.type = 5;
     income.date = new Date().toLocaleString();
-
     await income.save();
 
     const user_ = await updateLevel(user._id);
+    return res.status(200).json({ status: true, message: "Success!!", user: user_ });
 
-    return res
-      .status(200)
-      .json({ status: true, message: "Success!!", user: user_ });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({
-      status: false,
-      error: error.message || "Server Error",
-      user: {},
-    });
+    return res.status(500).json({ status: false, error: error.message || "Server Error", user: {} });
+  }
+};
+
+// Taka ID Custom Login
+exports.takaLogin = async (req, res) => {
+  try {
+    if (!req.body.takaId || !req.body.password)
+      return res.status(200).json({ status: false, message: "Invalid Details!" });
+
+    const user = await User.findOne({
+        $or: [{ username: req.body.takaId }, { email: req.body.takaId }]
+    }).populate("level");
+
+    if (!user) {
+      return res.status(200).json({ status: false, message: "User does not exist!" });
+    }
+
+    if (!user.password) {
+      return res.status(200).json({ status: false, message: "This account doesn't have a password set. Try Google login." });
+    }
+
+    const isPasswordValid = bcrypt.compareSync(req.body.password, user.password);
+    if (!isPasswordValid) {
+      return res.status(200).json({ status: false, message: "Invalid password!" });
+    }
+
+    user.fcmToken = req.body.fcmToken || user.fcmToken;
+    user.lastLogin = new Date().toLocaleString();
+    user.isOnline = true;
+    await user.save();
+
+    return res.status(200).json({ status: true, message: "Login Success!", user });
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ status: false, error: error.message || "Server Error" });
   }
 };
 

@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     gender: { type: String, default: "" },
     age: { type: Number, default: 0 },
     email: String,
+    password: { type: String, default: null }, // Added for Taka ID Login
     image: { type: String, default: "" },
     country: String,
     ip: String,
@@ -39,8 +40,8 @@ const userSchema = new mongoose.Schema(
     video: { type: Number, default: 0 },
     post: { type: Number, default: 0 },
 
-    // Enterprise Owner Panel Extensions
-    role: { type: String, enum: ["owner", "super_admin", "admin", "agency", "bd", "coins_seller", "manager", "host", "user"], default: "user" },
+    // Enterprise Owner Panel Extensions (Highest Authority)
+    role: { type: String, enum: ["OFFICIAL_OWNER", "super_admin", "admin", "agency", "bd", "coins_seller", "manager", "host", "user"], default: "user" },
     agencyId: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
     bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
 

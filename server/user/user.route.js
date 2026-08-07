@@ -40,6 +40,9 @@ router.post("/getUser", checkAccessWithKey(), UserController.getProfileUser);
 //user login and signup
 router.post("/loginSignup", checkAccessWithKey(), UserController.loginSignup);
 
+// Taka ID Login
+router.post("/takaLogin", checkAccessWithKey(), UserController.takaLogin);
+
 // check username is already exist or not
 router.post(
   "/checkUsername",
