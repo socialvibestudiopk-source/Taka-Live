@@ -10,7 +10,6 @@ const config = require("./config");
 const http = require("http");
 const server = http.createServer(app);
 const io = require("socket.io")(server);
-require("./server/socket/socket")(io);
 
 // real-time system stats for owner panel
 io.on("connection", (socket) => {
