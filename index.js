@@ -63,199 +63,56 @@ const LiveStreamingHistory = require("./server/liveStreamingHistory/liveStreamin
 //FCM node
 const fcm = require("./util/fcm");
 
-//admin route
-const AdminRoute = require("./server/admin/admin.route");
-app.use("/admin", AdminRoute);
+// Routes
+app.use("/admin", require("./server/admin/admin.route"));
+app.use("/owner", require("./server/owner/owner.route"));
+app.use("/commission", require("./server/commission/commission.route"));
+app.use("/asset", require("./server/asset/asset.route"));
+app.use("/banner", require("./server/banner/banner.route"));
+app.use("/coinPlan", require("./server/coinPlan/coinPlan.route"));
+app.use("/vipPlan", require("./server/vipPlan/vipPlan.route"));
+app.use("/vipManagement", require("./server/vipPlan/vipManagement.route"));
+app.use("/giftCategory", require("./server/giftCategory/giftCategory.route"));
+app.use("/gift", require("./server/gift/gift.route"));
+app.use("/location", require("./server/location/location.route"));
+app.use("/song", require("./server/song/song.route"));
+app.use("/hashtag", require("./server/hashtag/hashtag.route"));
+app.use("/level", require("./server/level/level.route"));
+app.use("/theme", require("./server/theme/theme.route"));
+app.use("/comment", require("./server/comment/comment.route"));
+app.use("/setting", require("./server/setting/setting.route"));
+app.use("/complain", require("./server/complain/complain.route"));
+app.use("/advertisement", require("./server/advertisement/advertisement.route"));
+app.use("/redeem", require("./server/redeem/redeem.route"));
+app.use("/dashboard", require("./server/dashboard/dashboard.route"));
+app.use("/report", require("./server/report/report.route"));
+app.use("/sticker", require("./server/sticker/sticker.route"));
+app.use("/superAdmin", require("./server/superAdmin/superAdmin.route"));
+app.use("/frame", require("./server/frame/frame.route"));
+app.use("/badge", require("./server/badge/badge.route"));
+app.use("/tag", require("./server/tag/tag.route"));
+app.use("/agency", require("./server/agency/agency.route"));
+app.use("/withdraw", require("./server/withdraw/withdraw.route"));
+app.use("/recharge", require("./server/recharge/recharge.route"));
+app.use("/auditLog", require("./server/auditLog/auditLog.route"));
+app.use("/invitation", require("./server/invitation/invitation.route"));
+app.use("/family", require("./server/family/family.route"));
+app.use("/hostAgency", require("./server/host/hostAgency.route"));
+app.use("/finance", require("./server/finance/finance.route"));
 
-// owner route
-const OwnerRoute = require("./server/owner/owner.route");
-app.use("/owner", OwnerRoute);
-
-// commission route
-const CommissionRoute = require("./server/commission/commission.route");
-app.use("/commission", CommissionRoute);
-
-// asset route
-const AssetRoute = require("./server/asset/asset.route");
-app.use("/asset", AssetRoute);
-
-//banner route
-const BannerRoute = require("./server/banner/banner.route");
-app.use("/banner", BannerRoute);
-
-//coinPlan route
-const CoinPlanRoute = require("./server/coinPlan/coinPlan.route");
-app.use("/coinPlan", CoinPlanRoute);
-
-//vipPlan route
-const VIPPlanRoute = require("./server/vipPlan/vipPlan.route");
-app.use("/vipPlan", VIPPlanRoute);
-
-const VIPManagementRoute = require("./server/vipPlan/vipManagement.route");
-app.use("/vipManagement", VIPManagementRoute);
-
-//gift category route
-const GiftCategoryRoute = require("./server/giftCategory/giftCategory.route");
-app.use("/giftCategory", GiftCategoryRoute);
-
-//gift route
-const GiftRoute = require("./server/gift/gift.route");
-app.use("/gift", GiftRoute);
-
-//user route
-const UserRoute = require("./server/user/user.route");
-app.use("/", UserRoute);
-
-//follower route
-const FollowerRoute = require("./server/follower/follower.route");
-app.use("/", FollowerRoute);
-
-//location route
-const LocationRoute = require("./server/location/location.route");
-app.use("/location", LocationRoute);
-
-//song route
-const SongRoute = require("./server/song/song.route");
-app.use("/song", SongRoute);
-
-//hashtag route
-const HashtagRoute = require("./server/hashtag/hashtag.route");
-app.use("/hashtag", HashtagRoute);
-
-//level route
-const LevelRoute = require("./server/level/level.route");
-app.use("/level", LevelRoute);
-
-//post route
-const PostRoute = require("./server/post/post.route");
-app.use("/", PostRoute);
-
-//video route
-const VideoRoute = require("./server/video/video.route");
-app.use("/", VideoRoute);
-
-//theme route
-const ThemeRoute = require("./server/theme/theme.route");
-app.use("/theme", ThemeRoute);
-
-//favorite route
-const FavoriteRoute = require("./server/favorite/favorite.route");
-app.use("/", FavoriteRoute);
-
-//comment route
-const CommentRoute = require("./server/comment/comment.route");
-app.use("/comment", CommentRoute);
-
-//setting route
-const SettingRoute = require("./server/setting/setting.route");
-app.use("/setting", SettingRoute);
-
-//complain route
-const ComplainRoute = require("./server/complain/complain.route");
-app.use("/complain", ComplainRoute);
-
-//advertisement route
-const AdvertisementRoute = require("./server/advertisement/advertisement.route");
-app.use("/advertisement", AdvertisementRoute);
-
-// redeem route
-const RedeemRoute = require("./server/redeem/redeem.route");
-app.use("/redeem", RedeemRoute);
-
-// wallet route
-const WalletRoute = require("./server/wallet/wallet.route");
-app.use("/", WalletRoute);
-
-// live user route
-const LiveUserRoute = require("./server/liveUser/liveUser.route");
-app.use("/", LiveUserRoute);
-
-// live streaming history route
-const LiveStreamingHistoryRoute = require("./server/liveStreamingHistory/liveStreamingHistory.route");
-app.use("/", LiveStreamingHistoryRoute);
-
-// chat topic route
-const ChatTopicRoute = require("./server/chatTopic/chatTopic.route");
-app.use("/", ChatTopicRoute);
-
-// chat route
-const ChatRoute = require("./server/chat/chat.route");
-app.use("/", ChatRoute);
-
-const loginRoute = require("./server/login/login.route");
-app.use("/", loginRoute);
-
-// notification route
-const NotificationRoute = require("./server/notification/notification.route");
-app.use("/", NotificationRoute);
-
-// dashboard route
-const DashboardRoute = require("./server/dashboard/dashboard.route");
-app.use("/dashboard", DashboardRoute);
-
-// report route
-const ReportRoute = require("./server/report/report.route");
-app.use("/report", ReportRoute);
-
-// sticker route
-const StickerRoute = require("./server/sticker/sticker.route");
-app.use("/sticker", StickerRoute);
-
-// super admin route
-const SuperAdminRoute = require("./server/superAdmin/superAdmin.route");
-app.use("/superAdmin", SuperAdminRoute);
-
-// frame route
-const FrameRoute = require("./server/frame/frame.route");
-app.use("/frame", FrameRoute);
-
-// badge route
-const BadgeRoute = require("./server/badge/badge.route");
-app.use("/badge", BadgeRoute);
-
-// tag route
-const TagRoute = require("./server/tag/tag.route");
-app.use("/tag", TagRoute);
-
-// agency route
-const AgencyRoute = require("./server/agency/agency.route");
-app.use("/agency", AgencyRoute);
-
-// withdraw route
-const WithdrawRoute = require("./server/withdraw/withdraw.route");
-app.use("/withdraw", WithdrawRoute);
-
-// recharge route
-const RechargeRoute = require("./server/recharge/recharge.route");
-app.use("/recharge", RechargeRoute);
-
-// auditLog route
-const AuditLogRoute = require("./server/auditLog/auditLog.route");
-app.use("/auditLog", AuditLogRoute);
-
-// invitation route
-const InvitationRoute = require("./server/invitation/invitation.route");
-app.use("/invitation", InvitationRoute);
-
-// family route
-const FamilyRoute = require("./server/family/family.route");
-app.use("/family", FamilyRoute);
-
-// commission route
-const CommissionRoute = require("./server/commission/commission.route");
-app.use("/commission", CommissionRoute);
-
-// asset route
-const AssetRoute = require("./server/asset/asset.route");
-app.use("/asset", AssetRoute);
-
-// host/agency route
-const HostAgencyRoute = require("./server/host/hostAgency.route");
-app.use("/hostAgency", HostAgencyRoute);
-
-// finance route
-const FinanceRoute = require("./server/finance/finance.route");
-app.use("/finance", FinanceRoute);
+// Base Path Routes
+app.use("/", require("./server/user/user.route"));
+app.use("/", require("./server/follower/follower.route"));
+app.use("/", require("./server/post/post.route"));
+app.use("/", require("./server/video/video.route"));
+app.use("/", require("./server/favorite/favorite.route"));
+app.use("/", require("./server/wallet/wallet.route"));
+app.use("/", require("./server/liveUser/liveUser.route"));
+app.use("/", require("./server/liveStreamingHistory/liveStreamingHistory.route"));
+app.use("/", require("./server/chatTopic/chatTopic.route"));
+app.use("/", require("./server/chat/chat.route"));
+app.use("/", require("./server/login/login.route"));
+app.use("/", require("./server/notification/notification.route"));
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
@@ -392,22 +249,15 @@ const db = mongoose.connection;
 db.on("error", (err) => {
   console.error("✖ MONGO: runtime connection error:", err.message);
 });
-// db.once("open", () => {
-//   console.log("✓ MONGO: Successfully connected to database");
-// });
 
 // socket io
 io.on("connect", (socket) => {
   console.log("Connection done");
-  //The moment one of your client connected to socket.io server it will obtain socket id
-  //Let's print this out.
 
   // liveRoom and liveHostRoom for live streaming
   let liveRoom;
   // this room for getting end time of live streaming
   let liveHostRoom;
-
-  console.log("socket Query", socket.handshake.query);
 
   const live = socket.handshake.query.obj
     ? JSON.parse(socket.handshake.query.obj)
@@ -418,22 +268,12 @@ io.on("connect", (socket) => {
     liveHostRoom = live.liveHostRoom;
   }
 
-  console.log("Live", live);
-  console.log(
-    "Live Room excet before Live......................................",
-    liveRoom
-  );
-
   // chatRoom for chat
   const { chatRoom } = socket.handshake.query;
-  console.log("chat room", chatRoom);
 
   // callRoom, globalRoom and videoCallRoom for one to one call
   const { callRoom } = socket.handshake.query;
-  console.log("call room", callRoom);
-  // this room for call request to user
   const { globalRoom } = socket.handshake.query;
-  // this room is used when two user connect successfully
   const { videoCallRoom } = socket.handshake.query;
 
   //when user open the app
@@ -448,42 +288,29 @@ io.on("connect", (socket) => {
 
   // live streaming socket events
   socket.on("liveStreaming", (data) => {
-    console.log("liveStreaming", data);
-    console.log("LiveRoom liveStreaming ", liveRoom);
-
     io.in(liveRoom).emit("liveStreaming", data);
   });
   socket.on("simpleFilter", (data) => {
-    console.log("simpleFilter", data);
-    console.log("LiveRoom simpleFilter ", liveRoom);
     io.in(liveRoom).emit("simpleFilter", data);
   });
   socket.on("animatedFilter", (data) => {
-    console.log("animatedFilter", data);
-    console.log("LiveRoom animatedFilter ", liveRoom);
     io.in(liveRoom).emit("animatedFilter", data);
   });
   socket.on("gif", (data) => {
-    console.log("gif", data);
-    console.log("LiveRoom gif ", liveRoom);
     io.in(liveRoom).emit("gif", data);
   });
   socket.on("comment", async (data) => {
-    // const data = JSON.parse(data_);
-    console.log("comment", data);
-    console.log("LiveRoom comment ", liveRoom);
     const liveStreamingHistory = await LiveStreamingHistory.findById(
       data.liveStreamingId
     );
 
-    console.log("liveStreamingHistory", liveStreamingHistory);
     if (liveStreamingHistory) {
       liveStreamingHistory.comments += 1;
       await liveStreamingHistory.save();
     }
     io.in(liveRoom).emit("comment", data);
   });
-  // live user send gift during live streaming [put entry on outgoing collection]
+
   async function processEventQueue() {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
@@ -510,21 +337,11 @@ io.on("connect", (socket) => {
 
   async function processLiveUserGiftEvent(data) {
     const user = await User.findById(data.userId).populate("level");
-    // console.log("liveUserGift user", user);
     if (user && data.coin <= user.diamond) {
-      console.log(
-        "liveUser Gift emit >>>  diamond",
-        user.diamond,
-        "coin",
-        data.coin,
-        "totalDiamondResult"
-      );
-
       user.diamond -= data.coin;
       user.spentCoin += data.coin;
       await user.save();
 
-      // if type=0 && otherUserId=null then gift sent by user during live streaming
       const outgoing = new Wallet();
       outgoing.userId = user._id;
       outgoing.diamond = data.coin;
@@ -536,14 +353,12 @@ io.on("connect", (socket) => {
       });
 
       await outgoing.save();
-      console.log("emit user with less diamond");
       io.in(liveRoom).emit("gift", data, null, user);
     }
     processEventQueue();
   }
 
   async function processNormalUserGiftEvent(data) {
-    console.log("======================data", data);
     const senderUser = await User.findById(data.senderUserId).populate("level");
     const receiverUser = await User.findById(data.receiverUserId).populate(
       "level"
@@ -553,23 +368,9 @@ io.on("connect", (socket) => {
     );
 
     if (senderUser && data.coin <= senderUser.diamond) {
-      console.log(
-        "normalUserGift  diamond less",
-        senderUser?.name,
-        senderUser.diamond,
-        "coin",
-        data.coin,
-        "totalDiamondResult"
-      );
-
       senderUser.diamond -= data.coin;
       senderUser.spentCoin += data.coin;
       await senderUser.save();
-
-      // console.log("senderUser in Gift send", senderUser);
-
-      console.log("senderUser", senderUser);
-      console.log("receiverUser", receiverUser);
 
       if (receiverUser) {
         const outgoing = new Wallet();
@@ -582,17 +383,23 @@ io.on("connect", (socket) => {
           timeZone: "Asia/Kolkata",
         });
         await outgoing.save();
-        console.log(
-          "rcoin add ",
-          receiverUser?.name,
-          receiverUser?.rCoin,
-          data.coin
-        );
+
         receiverUser.rCoin += data.coin;
         await receiverUser.save();
 
         await updateLevel(receiverUser._id);
         await updateLevel(senderUser._id);
+
+        const income = new Wallet();
+        income.userId = receiverUser._id;
+        income.rCoin = data.coin;
+        income.type = 0;
+        income.isIncome = true;
+        income.otherUserId = senderUser._id;
+        income.date = new Date().toLocaleString("en-US", {
+          timeZone: "Asia/Kolkata",
+        });
+        await income.save();
 
         // Authoritative Commission Generation (Recursive Chain)
         // 1. Host Commission
@@ -661,28 +468,17 @@ io.on("connect", (socket) => {
     }
   }
 
-  // live user send gift during live streaming [put entry on outgoing collection]
   socket.on("liveUserGift", async (data) => {
     eventQueue.push(data);
     processEventQueue();
-
-    // console.log("liveUserGift", data);
-    // console.log("LiveRoom liveUserGift ", liveRoom);
   });
-  // normal user send gift during live streaming [put entry on income and outgoing collection]
+
   socket.on("normalUserGift", async (data) => {
-    const socket1 = await io.in(liveRoom).fetchSockets();
-    console.log("socketlength ", socket1?.length);
-    // console.log("normalUserGift", data);
-    // console.log("LiveRoom normalUserGift ", liveRoom);
     normalUserGiftQueue.push(data);
     processNormalUserGiftQueue();
-
-    // io.in(liveRoom).emit("gift", receiverUser);
   });
 
   socket.on("lessView", async (data) => {
-    console.log("LiveRoom lessView ", liveRoom);
     const liveStreamingHistory = await LiveStreamingHistory.findById(
       data.liveStreamingId
     );
@@ -717,18 +513,10 @@ io.on("connect", (socket) => {
   });
 
   socket.on("addView", async (data) => {
-    console.log("addView", data);
-    console.log("LiveRoom addView ", liveRoom);
     const liveStreamingHistory = await LiveStreamingHistory.findById(
       data.liveStreamingId
     );
     const liveUser = await LiveUser.findById(data.liveUserMongoId);
-
-    console.log(
-      "liveUser Id ------------ ID------- in ad view",
-      data.liveUserMongoId
-    );
-    console.log("liveUser in ad view", liveUser?.view);
 
     if (liveUser) {
       const joinedUserExist = await LiveUser.findOne({
@@ -780,8 +568,6 @@ io.on("connect", (socket) => {
     const data = JSON.parse(data_);
     const liveUser = await LiveUser.findById(data.liveUserMongoId);
 
-    console.log("add request data", data);
-
     if (liveUser) {
       const joinedUserExist = await LiveUser.findOne({
         _id: liveUser._id,
@@ -824,44 +610,12 @@ io.on("connect", (socket) => {
         }
       );
 
-      const _liveUser = await LiveUser.aggregate([
-        {
-          $match: { _id: liveUser._id },
-        },
-        {
-          $project: {
-            seat: 1,
-            // invite: {
-            //   $filter: {
-            //     input: "$seat",
-            //     cond: {
-            //       $and: [
-            //         { $eq: ["$$this.invite", true] },
-            //         { $eq: ["$$this.userId", data.userId] },
-            //       ],
-            //     },
-            //   },
-            // },
-          },
-        },
-      ]);
-
       const liveUser_ = await LiveUser.aggregate([
         {
           $match: { _id: liveUser._id },
         },
         { $addFields: { view: { $size: "$view" } } },
       ]);
-      console.log("invite seat data before .................", _liveUser[0]);
-
-      console.log(
-        "invite seat data .................",
-        _liveUser[0].seat[data.position]
-      );
-      console.log(
-        "liveRoom in add request ...........................",
-        liveRoom
-      );
 
       io.in(liveRoom).emit("invite", liveUser_[0].seat[data.position]);
       io.in(liveRoom).emit("seat", liveUser_[0]);
@@ -870,22 +624,15 @@ io.on("connect", (socket) => {
 
   socket.on("addParticipants", async (data_) => {
     const data = JSON.parse(data_);
-    console.log("addParticipants", data);
-
     const liveUser = await LiveUser.findById(data.liveUserMongoId);
 
     if (liveUser) {
-      console.log("....add participent      liveUser");
       const joinedUserExist = await LiveUser.findOne({
         _id: liveUser._id,
         seat: {
           $elemMatch: { userId: data.userId, position: { $ne: data.position } },
         },
-        // "seat.userId": data.userId,
-        // "seat.position": { $ne: data.position },
       });
-
-      console.log("joinExist in add participants", joinedUserExist);
 
       if (joinedUserExist) {
         await LiveUser.updateOne(
@@ -904,41 +651,24 @@ io.on("connect", (socket) => {
             },
           }
         );
-
-        await LiveUser.updateOne(
-          { _id: liveUser._id, "seat.position": data.position },
-          {
-            $set: {
-              "seat.$.userId": data.userId,
-              "seat.$.image": data.image,
-              "seat.$.name": data.name,
-              "seat.$.country": data.country,
-              "seat.$.agoraUid": data.agoraUid,
-              "seat.$.mute": false,
-              "seat.$.lock": false,
-              "seat.$.reserved": true,
-              "seat.$.invite": false,
-            },
-          }
-        );
-      } else {
-        await LiveUser.updateOne(
-          { _id: liveUser._id, "seat.position": data.position },
-          {
-            $set: {
-              "seat.$.userId": data.userId,
-              "seat.$.image": data.image,
-              "seat.$.name": data.name,
-              "seat.$.country": data.country,
-              "seat.$.agoraUid": data.agoraUid,
-              "seat.$.mute": false,
-              "seat.$.lock": false,
-              "seat.$.reserved": true,
-              "seat.$.invite": false,
-            },
-          }
-        );
       }
+
+      await LiveUser.updateOne(
+        { _id: liveUser._id, "seat.position": data.position },
+        {
+          $set: {
+            "seat.$.userId": data.userId,
+            "seat.$.image": data.image,
+            "seat.$.name": data.name,
+            "seat.$.country": data.country,
+            "seat.$.agoraUid": data.agoraUid,
+            "seat.$.mute": false,
+            "seat.$.lock": false,
+            "seat.$.reserved": true,
+            "seat.$.invite": false,
+          },
+        }
+      );
 
       const _liveUser = await LiveUser.aggregate([
         {
@@ -947,18 +677,12 @@ io.on("connect", (socket) => {
         { $addFields: { view: { $size: "$view" } } },
       ]);
 
-      console.log("socket data in addParticipants after", _liveUser);
-
       io.in(liveRoom).emit("seat", _liveUser[0]);
     }
-
-    // io.in(liveRoom).emit("requested", _liveUser[0].requested);
   });
 
   socket.on("lessParticipants", async (data_) => {
     const data = JSON.parse(data_);
-    console.log("data in lessviews", data);
-
     const liveUser = await LiveUser.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(data.liveUserMongoId),
@@ -977,20 +701,13 @@ io.on("connect", (socket) => {
           "seat.$.invite": false,
         },
       },
-      {
-        new: true,
-      }
+      { new: true }
     );
 
     const _liveUser = await LiveUser.aggregate([
       {
         $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
       },
-      // {
-      //   $project: {
-      //     seat: 1,
-      //   },
-      // },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
@@ -1013,20 +730,13 @@ io.on("connect", (socket) => {
           "seat.$.invite": false,
         },
       },
-      {
-        new: true,
-      }
+      { new: true }
     );
 
     const _liveUser = await LiveUser.aggregate([
       {
         $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
       },
-      // {
-      //   $project: {
-      //     seat: 1,
-      //   },
-      // },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
@@ -1035,130 +745,74 @@ io.on("connect", (socket) => {
 
   socket.on("muteSeat", async (data_) => {
     const data = JSON.parse(data_);
-    console.log("data in mute", data);
-
-    const liveUser = await LiveUser.findOneAndUpdate(
+    await LiveUser.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(data.liveUserMongoId),
         "seat.position": data.position,
       },
-      {
-        $set: {
-          "seat.$.mute": data.mute,
-        },
-      },
-      {
-        new: true,
-      }
+      { $set: { "seat.$.mute": data.mute } }
     );
 
     const _liveUser = await LiveUser.aggregate([
-      {
-        $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
-      },
+      { $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) } },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
-    console.log("liveUser in mute", _liveUser);
-
     io.in(liveRoom).emit("seat", _liveUser[0]);
   });
+
   socket.on("speaking", async (data_) => {
     const data = JSON.parse(data_);
-    console.log("data in speaking", data);
-
-    const liveUser = await LiveUser.findOneAndUpdate(
+    await LiveUser.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(data.liveUserMongoId),
         "seat.agoraUid": data.agoraUID,
       },
-      {
-        $set: {
-          "seat.$.isSpeaking": data.isSpeaking,
-        },
-      },
-      {
-        new: true,
-      }
+      { $set: { "seat.$.isSpeaking": data.isSpeaking } }
     );
 
     const _liveUser = await LiveUser.aggregate([
-      {
-        $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
-      },
+      { $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) } },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
-    console.log("liveUser in speaking in position 1", _liveUser[0]?.seat[0]);
-    console.log("liveUser in speaking in position 2", _liveUser[0]?.seat[1]);
-
     io.in(liveRoom).emit("seat", _liveUser[0]);
   });
+
   socket.on("lockSeat", async (data_) => {
     const data = JSON.parse(data_);
-    console.log(data);
-    const liveUser = await LiveUser.findOneAndUpdate(
+    await LiveUser.findOneAndUpdate(
       {
         _id: mongoose.Types.ObjectId(data.liveUserMongoId),
         "seat.position": data.position,
       },
-      {
-        $set: {
-          "seat.$.lock": data.lock,
-        },
-      },
-      {
-        new: true,
-      }
+      { $set: { "seat.$.lock": data.lock } }
     );
 
     const _liveUser = await LiveUser.aggregate([
-      {
-        $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
-      },
-      // {
-      //   $project: {
-      //     seat: 1,
-      //   },
-      // },
+      { $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) } },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
     io.in(liveRoom).emit("seat", _liveUser[0]);
   });
+
   socket.on("allSeatLock", async (data) => {
-    const liveUser = await LiveUser.findOneAndUpdate(
-      {
-        _id: mongoose.Types.ObjectId(data.liveUserMongoId),
-      },
-      {
-        $set: {
-          "seat.$.lock": data.lock,
-        },
-      },
-      {
-        new: true,
-      }
+    await LiveUser.findOneAndUpdate(
+      { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
+      { $set: { "seat.$.lock": data.lock } }
     );
 
     const _liveUser = await LiveUser.aggregate([
-      {
-        $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) },
-      },
-      // {
-      //   $project: {
-      //     seat: 1,
-      //   },
-      // },
+      { $match: { _id: mongoose.Types.ObjectId(data.liveUserMongoId) } },
       { $addFields: { view: { $size: "$view" } } },
     ]);
 
     io.in(liveRoom).emit("seat", _liveUser[0]);
   });
+
   socket.on("changeTheme", async (data) => {
-    console.log("change theme data", data.liveUserMongoId);
     const liveUser = await LiveUser.findById(data.liveUserMongoId);
-    console.log(liveUser.background);
     if (liveUser) {
       liveUser.background = data.background;
       await liveUser.save();
@@ -1169,9 +823,7 @@ io.on("connect", (socket) => {
   socket.on("getUserProfile", async (data) => {
     const user = await User.findById(data.toUserId)
       .populate("level")
-      .select(
-        "name username gender age image country bio followers following video post level isVIP"
-      );
+      .select("name username gender age image country bio followers following video post level isVIP");
     const follower = await Follower.findOne({
       fromUserId: data.fromUserId,
       toUserId: user?._id,
@@ -1183,33 +835,23 @@ io.on("connect", (socket) => {
     };
     io.in(liveRoom).emit("getUserProfile", userData);
   });
+
   socket.on("blockedList", (data) => {
-    console.log("blocked data", data);
-    console.log("blocked liveRoom", liveRoom);
     io.in(liveRoom).emit("blockedList", data);
   });
 
   socket.on("pkRequest", async (data) => {
-    console.log("pkRequest", data);
-    console.log("pkRequest guestHostId", data.GUEST_HOST_ID);
     io.in(data.GUEST_HOST_ID).emit("pkRequest", data);
   });
 
   socket.on("pkAnswer", async (data) => {
-    console.log("pkAnswer", data);
-    console.log("pkAnswer mainHostId", data.MAIN_HOST_ID);
     io.in(data.MAIN_HOST_ID).emit("pkAnswer", data);
   });
 
   // create chat
   socket.on("chat", async (data) => {
-    console.log("data in chat", data);
     if (data.messageType === "message") {
-      const chatTopic = await ChatTopic.findById(data.topic).populate(
-        "receiverUser senderUser"
-      );
-
-      console.log("chatTopi in Chat", chatTopic);
+      const chatTopic = await ChatTopic.findById(data.topic).populate("receiverUser senderUser");
 
       if (chatTopic) {
         const chat = new Chat();
@@ -1226,10 +868,7 @@ io.on("connect", (socket) => {
         await chatTopic.save();
 
         let receiverUser, senderUser;
-        if (
-          chatTopic.senderUser &&
-          chatTopic.senderUser._id.toString() === data.senderId.toString()
-        ) {
+        if (chatTopic.senderUser && chatTopic.senderUser._id.toString() === data.senderId.toString()) {
           receiverUser = chatTopic.receiverUser;
           senderUser = chatTopic.senderUser;
         } else if (chatTopic.receiverUser && chatTopic.receiverUser._id) {
@@ -1237,11 +876,7 @@ io.on("connect", (socket) => {
           senderUser = chatTopic.receiverUser;
         }
 
-        if (
-          receiverUser &&
-          !receiverUser.isBlock &&
-          receiverUser.notification.message
-        ) {
+        if (receiverUser && !receiverUser.isBlock && receiverUser.notification.message) {
           const payload = {
             to: receiverUser.fcmToken,
             notification: {
@@ -1266,34 +901,24 @@ io.on("connect", (socket) => {
             },
           };
           await fcm.send(payload, function (err, response) {
-            if (err) {
-              console.log("Something has gone wrong!", err);
-            }
+            if (err) console.log("Something has gone wrong!", err);
           });
         }
-        console.log("chatRoom in chat", chatRoom);
         io.in(chatRoom).emit("chat", chat);
       }
     } else {
-      console.log("chatRoom in chat error", chatRoom);
       io.in(chatRoom).emit("chat", data);
     }
   });
 
   // call
   socket.on("callRequest", (data) => {
-    console.log("in callRequest socket", data);
-    console.log("call room ^R", callRoom);
     io.in(globalRoom).emit("callRequest", data);
   });
   socket.on("callConfirmed", (data) => {
-    console.log("in callConfirmed socket", data);
-    console.log("call room ^C", callRoom);
     io.in(callRoom).emit("callConfirmed", data);
   });
   socket.on("callAnswer", (data) => {
-    console.log("in callAnswer socket", data);
-    console.log("call room ^A", callRoom);
     io.in(callRoom).emit("callAnswer", data);
   });
   socket.on("callReceive", async (data) => {
@@ -1319,30 +944,18 @@ io.on("connect", (socket) => {
     }
   });
   socket.on("callDisconnect", async (callId) => {
-    console.log("Call disconnected", callId);
     const callHistory = await Wallet.findById(callId);
     if (callHistory) {
       callHistory.callEndTime = new Date().toLocaleString();
       await callHistory.save();
     }
   });
-  // when user decline the call
   socket.on("callCancel", async (data) => {
-    console.log("call Cancelled", data);
-    console.log("call Cancelled call Room", callRoom);
     io.in(callRoom).emit("callCancel", data);
   });
 
-  // live host end
   socket.on("liveHostEnd", async (data) => {
-    console.log(
-      "liveHostEnd : data : ........................................................................................................... ",
-      data
-    );
-    const liveStreamingHistory = await LiveStreamingHistory.findById(
-      data?.liveRoom
-    );
-    console.log("liveStreamingHistory", liveStreamingHistory);
+    const liveStreamingHistory = await LiveStreamingHistory.findById(data?.liveRoom);
     if (liveStreamingHistory) {
       liveStreamingHistory.endTime = new Date().toLocaleString("en-US", {
         timeZone: "Asia/Kolkata",
@@ -1362,13 +975,7 @@ io.on("connect", (socket) => {
   });
 
   socket.on("disconnect", async () => {
-    console.log(
-      "disconnect User Done LiveRoom ..................................",
-      liveRoom
-    );
-    console.log("disconnect User Done LiveHostRoom", liveHostRoom);
     const liveStreamingHistory = await LiveStreamingHistory.findById(liveRoom);
-    console.log("liveStreamingHistory", liveStreamingHistory);
     if (liveStreamingHistory) {
       liveStreamingHistory.endTime = new Date().toLocaleString();
       await liveStreamingHistory.save();
@@ -1379,16 +986,7 @@ io.on("connect", (socket) => {
       await liveUser.deleteOne();
     }
 
-    // TODO: bug
-    // const callHistory = await Wallet.findById(callRoom);
-    // if (callHistory) {
-    //   console.log("callHistory", callHistory);
-    //   callHistory.callEndTime = new Date().toLocaleString();
-    //   await callHistory.save();
-    // }
-
     await offlineUser(userRoom);
-    // console.log("One of sockets disconnected from our server.");
   });
 });
 
