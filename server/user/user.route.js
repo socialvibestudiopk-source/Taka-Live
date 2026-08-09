@@ -112,6 +112,6 @@ router.post("/bd/invite-bd", checkAccessWithKey(), BDController.sendBDInvitation
 router.get("/bd/my-bds", checkAccessWithKey(), BDController.getMyBDs);
 router.post("/bd/accept-invitation", checkAccessWithKey(), BDController.acceptBDInvitation);
 
-router.patch("/IdGenerate", checkAccessWithKey(), UserController.IdGenerate);
+// router.patch("/IdGenerate", checkAccessWithKey(), UserController.IdGenerate);
 
 module.exports = router;

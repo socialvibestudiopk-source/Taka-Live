@@ -1097,6 +1097,10 @@ exports.updateRole = async (req, res) => {
 
     await user.save();
 
+    // Apply Role Asset Rules
+    const AssetController = require("../asset/asset.controller");
+    await AssetController.applyRoleAssetRules(user._id, user.role);
+
     return res.status(200).json({
       status: true,
       message: `User promoted from ${oldRole} to ${user.role} successfully!`,

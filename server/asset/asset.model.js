@@ -11,7 +11,7 @@ const assetSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["STORE", "MANAGEMENT", "VIP", "OFFICIAL", "MANAGER", "SUPER_ADMIN", "BD_LEADER", "BD", "AGENCY", "HOST", "SPECIAL"],
+      enum: ["STORE", "MANAGEMENT", "VIP", "OFFICIAL", "MANAGER", "SUPER_ADMIN", "BD_LEADER", "BD", "AGENCY", "HOST", "SPECIAL", "MODEL"],
       default: "STORE"
     },
     price: { type: Number, default: 0 },

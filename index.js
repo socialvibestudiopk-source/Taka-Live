@@ -114,7 +114,15 @@ app.use("/", require("./server/login/login.route"));
 app.use("/", require("./server/notification/notification.route"));
 
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
+  const firebaseStatus = firebaseService.isInitialized ? "ACTIVE" : "DISABLED";
+  res.status(200).json({
+    status: "OK",
+    uptime: process.uptime(),
+    db: mongoose.connection.readyState === 1 ? "CONNECTED" : "DISCONNECTED",
+    firebase: firebaseStatus,
+    version: "1.2.0-master",
+    environment: process.env.NODE_ENV || "production"
+  });
 });
 
 function _0x5941(_0x16e7b2, _0x4d2766) {
