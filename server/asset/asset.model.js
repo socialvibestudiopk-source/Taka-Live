@@ -6,7 +6,7 @@ const assetSchema = new mongoose.Schema(
     image: { type: String, required: true },
     type: {
       type: String,
-      enum: ["FRAME", "BADGE", "VEHICLE", "BUBBLE", "MEDAL", "TAG", "NAMEPLATE", "THEME"],
+      enum: ["FRAME", "BADGE", "VEHICLE", "BUBBLE", "MEDAL", "TAG", "NAMEPLATE", "THEME", "MODEL"],
       required: true
     },
     category: {

@@ -834,3 +834,38 @@ exports.sendGiftFakeHost = async (req, res) => {
       .json({ status: false, error: error.message || "Server Error" });
   }
 };
+
+// Owner/Admin manual wallet adjustment (Improved with reason and adminId)
+exports.adjustWallet = async (req, res) => {
+    try {
+        const { userId, diamondDelta = 0, rCoinDelta = 0, reason } = req.body;
+        const user = await User.findById(userId);
+        if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+        const wallet = new Wallet();
+        wallet.userId = user._id;
+        wallet.type = 8; // Admin adjustment
+        wallet.date = new Date().toLocaleString();
+        wallet.reason = reason || "Admin manual adjustment";
+        wallet.adminId = req.admin?._id;
+
+        if (diamondDelta !== 0) {
+            user.diamond += Number(diamondDelta);
+            wallet.diamond = Math.abs(Number(diamondDelta));
+            wallet.isIncome = Number(diamondDelta) > 0;
+        }
+
+        if (rCoinDelta !== 0) {
+            user.rCoin += Number(rCoinDelta);
+            wallet.rCoin = Math.abs(Number(rCoinDelta));
+            wallet.isIncome = Number(rCoinDelta) > 0;
+        }
+
+        await user.save();
+        await wallet.save();
+
+        return res.status(200).json({ status: true, message: "Wallet adjusted successfully", user });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};

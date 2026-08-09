@@ -24,6 +24,10 @@ const walletSchema = new mongoose.Schema(
     callConnect: { type: Boolean, default: false },
     callStartTime: { type: String, default: null },
     callEndTime: { type: String, default: null },
+
+    // Audit for manual adjustments
+    reason: { type: String, default: null },
+    adminId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
   },
   {
     timestamps: false,
