@@ -3,10 +3,42 @@ const LiveUser = require("../liveUser/liveUser.model");
 const Wallet = require("../wallet/wallet.model");
 const Agency = require("../agency/agency.model");
 const Invitation = require("../invitation/invitation.model");
-const Withdraw = require("../withdraw/withdraw.model"); // Assuming this exists
+const Withdraw = require("../withdraw/withdraw.model");
 const moment = require("moment");
 const mongoose = require("mongoose");
 
+// For backward compatibility with standard Admin Panel
+exports.dashboard = async (req, res) => {
+    try {
+        const totalUser = await User.countDocuments();
+        const liveUser = await LiveUser.countDocuments();
+
+        return res.status(200).json({
+            status: true,
+            message: "Success",
+            totalUser,
+            liveUser,
+            // Add other standard fields if needed by the old panel
+        });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+exports.analytic = async (req, res) => {
+    try {
+        // Basic analytics for the old panel
+        return res.status(200).json({
+            status: true,
+            message: "Success",
+            chartData: [] // Mock or simple aggregate
+        });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// New Enterprise Owner Stats
 exports.getOwnerStats = async (req, res) => {
   try {
     const startOfToday = moment().startOf("day").toDate();
