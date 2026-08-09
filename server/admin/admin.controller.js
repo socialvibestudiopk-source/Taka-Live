@@ -751,3 +751,26 @@ exports.destroy = async (req, res) => {
     return res.status(500).json({ status: false, error: error.message });
   }
 };
+
+// set password (forgot password flow)
+exports.setPassword = async (req, res) => {
+    try {
+        if (!req.body.newPass || !req.body.confirmPass) {
+            return res.status(200).json({ status: false, message: "Invalid Details!" });
+        }
+
+        const admin = await Admin.findById(req.params.adminId);
+        if (!admin) return res.status(200).json({ status: false, message: "Admin not found" });
+
+        if (req.body.newPass !== req.body.confirmPass) {
+            return res.status(200).json({ status: false, message: "Password and Confirm Password does not match" });
+        }
+
+        admin.password = bcrypt.hashSync(req.body.newPass, 10);
+        await admin.save();
+
+        return res.status(200).json({ status: true, message: "Password Set Successfully" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
