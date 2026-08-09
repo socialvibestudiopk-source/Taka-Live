@@ -3,6 +3,9 @@ const mongoose = require("mongoose");
 const postSchema = new mongoose.Schema(
   {
     post: String,
+    thumbnail: { type: String, default: null },
+    postType: { type: Number, enum: [0, 1, 2], default: 0 }, // 0: photo, 1: video, 2: multi-photo
+    multiPost: { type: Array, default: [] },
     hashtag: { type: Array, default: null },
     mentionPeople: { type: Array, default: null },
     location: { type: String, default: null },

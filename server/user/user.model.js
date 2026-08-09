@@ -41,14 +41,46 @@ const userSchema = new mongoose.Schema(
     post: { type: Number, default: 0 },
 
     // Enterprise Owner Panel Extensions (Highest Authority)
-    role: { type: String, enum: ["OFFICIAL_OWNER", "super_admin", "admin", "agency", "bd", "coins_seller", "manager", "host", "user"], default: "user" },
+    role: { type: String, enum: ["OFFICIAL_OWNER", "super_admin", "admin", "agency", "bd", "bd_leader", "coins_seller", "manager", "host", "user"], default: "user" },
     agencyId: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", default: null },
-    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    bdLeaderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    familyId: { type: mongoose.Schema.Types.ObjectId, ref: "Family", default: null },
+    hostStatus: { type: String, enum: ["ACTIVE", "PENDING", "SUSPENDED", "NONE"], default: "NONE" },
+    agencyStatus: { type: String, enum: ["ACTIVE", "PENDING", "SUSPENDED", "NONE"], default: "NONE" },
+
+    region: { type: String, default: null },
+    commission: { type: Number, default: 0 },
+    assignedAgencyCount: { type: Number, default: 0 },
+    assignedBDCount: { type: Number, default: 0 },
+    permissions: [String], // Array of granular permission strings (e.g. "users.ban")
+
+    // Identity Verification
+    isVerified: { type: Boolean, default: false },
+    verificationDetails: {
+      idNumber: String,
+      idImage: String,
+      verifiedAt: Date
+    },
+
+    // Detailed Inventory tracking
+    inventory: {
+      frames: [{ type: mongoose.Schema.Types.ObjectId, ref: "Frame" }],
+      badges: [{ type: mongoose.Schema.Types.ObjectId, ref: "Badge" }],
+      bubbles: [String],
+      entranceEffects: [String],
+      vehicles: [String]
+    },
 
     level: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Level",
       default: null,
+    },
+    charmLevel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Level",
+        default: null,
     },
     xp: { type: Number, default: 0 },
 
@@ -73,6 +105,7 @@ const userSchema = new mongoose.Schema(
     },
 
     isVIP: { type: Boolean, default: false },
+    profileSetupCompleted: { type: Boolean, default: false },
     plan: {
       planStartDate: { type: String, default: null }, // VIP plan start date
       planId: { type: mongoose.Schema.Types.ObjectId, default: null },

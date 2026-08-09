@@ -59,6 +59,17 @@ exports.userIsLive = async (req, res) => {
           .json({ status: false, message: "User does not Exist!" });
       }
 
+      // CHECK FOR EXISTING ROOM (Duplicate Protection)
+      const existingLive = await LiveUser.findOne({ liveUserId: user._id });
+      if (existingLive) {
+          console.log("Returning existing room for user:", user._id);
+          const liveUser_ = await LiveUser.aggregate([
+            { $match: { _id: existingLive._id } },
+            { $addFields: { view: { $size: "$view" } } }
+          ]);
+          return res.status(200).json({ status: true, message: "Already Live!", liveUser: liveUser_[0] });
+      }
+
       const setting = await Setting.findOne({});
       if (!setting)
         return res
@@ -201,6 +212,75 @@ exports.userIsLive = async (req, res) => {
     return res
       .status(500)
       .json({ status: false, error: error.message || "Server Error" });
+  }
+};
+
+// check if user is live
+exports.checkLive = async (req, res) => {
+  try {
+    if (!req.query.userId) {
+      return res.status(200).json({ status: false, message: "Invalid Details!" });
+    }
+
+    const liveUser = await LiveUser.findOne({ liveUserId: req.query.userId });
+
+    if (liveUser) {
+      return res.status(200).json({
+        status: true,
+        message: "User is Live!",
+        liveUser,
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        message: "User is not Live!",
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: false,
+      error: error.message || "Server Error",
+    });
+  }
+};
+
+// terminate live session
+exports.terminateAudioSession = async (req, res) => {
+  try {
+    if (!req.query.userId) {
+      return res.status(200).json({ status: false, message: "Invalid Details!" });
+    }
+
+    const liveUser = await LiveUser.findOne({ liveUserId: req.query.userId });
+
+    if (liveUser) {
+      // Mark user as not busy
+      const user = await User.findById(req.query.userId);
+      if (user) {
+        user.isBusy = false;
+        user.isOnline = true; // still online but not in room
+        await user.save();
+      }
+
+      await liveUser.deleteOne();
+
+      return res.status(200).json({
+        status: true,
+        message: "Live session terminated successfully!",
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        message: "No active live session found for this user!",
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: false,
+      error: error.message || "Server Error",
+    });
   }
 };
 

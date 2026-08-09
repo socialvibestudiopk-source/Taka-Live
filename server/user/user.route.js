@@ -4,6 +4,8 @@ const multer = require("multer");
 const storage = require("../../util/multer");
 
 const UserController = require("./user.controller");
+const BDController = require("./bd.controller");
+const AuthorityController = require("./authority.controller");
 const upload = multer({
   storage,
 });
@@ -14,6 +16,7 @@ const checkAccessWithKey = require("../../checkAccess");
 
 // get user list
 router.get("/getUsers", checkAccessWithKey(), UserController.index);
+router.get("/getUserByUniqueId", checkAccessWithKey(), UserController.getByUniqueId);
 
 // get popular user by followers
 router.get(
@@ -34,6 +37,9 @@ router.post("/user/online", UserController.userIsOnline);
 // search user by name and username
 router.post("/user/search", checkAccessWithKey(), UserController.search);
 
+// global search
+router.post("/user/global-search", checkAccessWithKey(), UserController.globalSearch);
+
 // get user profile of post[feed]
 router.post("/getUser", checkAccessWithKey(), UserController.getProfileUser);
 
@@ -42,6 +48,9 @@ router.post("/loginSignup", checkAccessWithKey(), UserController.loginSignup);
 
 // Taka ID Login
 router.post("/takaLogin", checkAccessWithKey(), UserController.takaLogin);
+
+// Security Update
+router.post("/user/updateSecurity", checkAccessWithKey(), UserController.updateSecurity);
 
 // check username is already exist or not
 router.post(
@@ -72,6 +81,12 @@ router.post(
   UserController.updateProfile
 );
 
+// Advanced User Actions
+router.patch("/user/forceLogout/:userId", checkAccessWithKey(), UserController.forceLogout);
+router.patch("/user/changeId/:userId", checkAccessWithKey(), UserController.changeNumericId);
+router.post("/user/grantAsset", checkAccessWithKey(), UserController.grantAsset);
+router.post("/user/removeAsset", checkAccessWithKey(), UserController.removeAsset);
+
 // bock unblock user
 router.patch(
   "/blockUnblock/:userId",
@@ -85,6 +100,17 @@ router.patch(
   checkAccessWithKey(),
   UserController.updateRole
 );
+
+// Authority & Navigation
+router.get("/user/authorized-modules/:userId", checkAccessWithKey(), AuthorityController.getAuthorizedModules);
+
+// BD Center APIs
+router.get("/bd/dashboard", checkAccessWithKey(), BDController.getDashboard);
+router.get("/bd/search-user", checkAccessWithKey(), BDController.searchUser);
+router.post("/bd/invite-agency", checkAccessWithKey(), BDController.sendAgencyInvitation);
+router.post("/bd/invite-bd", checkAccessWithKey(), BDController.sendBDInvitation);
+router.get("/bd/my-bds", checkAccessWithKey(), BDController.getMyBDs);
+router.post("/bd/accept-invitation", checkAccessWithKey(), BDController.acceptBDInvitation);
 
 router.patch("/IdGenerate", checkAccessWithKey(), UserController.IdGenerate);
 

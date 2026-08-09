@@ -5,13 +5,31 @@ const VIPPlan = require("../vipPlan/vipPlan.model");
 const Wallet = require("../wallet/wallet.model");
 const Level = require("../level/level.model");
 const LiveUser = require("../liveUser/liveUser.model");
+const AuditLog = require("../auditLog/auditLog.model");
+const { admin } = require("../../services/firebaseService");
 const fs = require("fs");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const config = require("../../config");
 const moment = require("moment");
 const arrayShuffle = require("shuffle-array");
 const deleteFile = require("../../util/deleteFile");
 const { compressImage } = require("../../util/compressImage");
 const shuffleArray = require("shuffle-array");
+
+// get staff list (Enterprise Owner Panel)
+exports.getStaffList = async (req, res) => {
+  try {
+    const staffRoles = ["super_admin", "admin", "agency", "bd", "bd_leader", "coins_seller", "manager", "OFFICIAL_OWNER"];
+    const staff = await User.find({ role: { $in: staffRoles } })
+      .select("name username role image lastLogin isBlock uniqueId")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ status: true, message: "Success", staff });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
 
 // get users list
 exports.index = async (req, res) => {
@@ -157,63 +175,111 @@ exports.getPopularUser = async (req, res) => {
   }
 };
 
-// user signup and login
+// user signup and login (Enterprise Grade with Firebase Verification)
 exports.loginSignup = async (req, res) => {
   try {
-    if (!req.body.identity || !req.body.email)
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Details!", user: {} });
+    const { identity, email, fcmToken, loginType, name, username, image, idToken, password } = req.body;
 
-    const userExist = await User.findOne({ email: req.body.email }).populate("level");
+    if (!identity || (!email && loginType != 2))
+      return res.status(200).json({ status: false, message: "Invalid Details!", user: {} });
 
-    if (userExist) {
-      userExist.fcmToken = req.body.fcmToken;
-      await userExist.save();
-      return res.status(200).json({ status: true, message: "Success!!", user: userExist });
+    // Optional: Verify Google ID Token if provided
+    if (loginType == 0 && idToken) {
+        try {
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
+            if (decodedToken.email !== email) throw new Error("Token mismatch");
+        } catch (e) {
+            return res.status(200).json({ status: false, message: "Google verification failed" });
+        }
     }
 
-    const userNameExist = await User.findOne({ username: req.body.username });
-    if (userNameExist) {
-      return res.status(200).json({ status: false, message: "Username already taken!", user: {} });
+    let user = await User.findOne({
+        $or: [{ identity: identity }, { email: email }]
+    }).populate("level");
+
+    if (user) {
+      if (user.isBlock) return res.status(200).json({ status: false, message: "Account Blocked!" });
+
+      user.fcmToken = fcmToken || user.fcmToken;
+      user.lastLogin = new Date().toLocaleString();
+      user.isOnline = true;
+      await user.save();
+
+      const token = jwt.sign({ _id: user._id, role: user.role }, config.JWT_SECRET);
+      return res.status(200).json({ status: true, message: "Success!!", user, token });
     }
 
+    // Handle Signup
     const newUser = new User();
+    newUser.uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
+    newUser.lastLogin = new Date().toLocaleString();
+    newUser.isOnline = true;
+    newUser.loginType = loginType;
+    newUser.identity = identity;
+    newUser.email = email;
+    newUser.name = name;
+    newUser.username = username || "user_" + Math.floor(Math.random() * 10000);
+    newUser.image = image;
+    newUser.profileSetupCompleted = false;
+
+    if (password) {
+        newUser.password = bcrypt.hashSync(password, 10);
+    }
+
     // Generate referral code
     const randomChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let referralCode = "";
-    for (let i = 0; i < 8; i++) {
-      referralCode += randomChars.charAt(Math.floor(Math.random() * randomChars.length));
-    }
+    for (let i = 0; i < 8; i++) referralCode += randomChars.charAt(Math.floor(Math.random() * randomChars.length));
+    newUser.referralCode = referralCode;
 
     const setting = await Setting.findOne({});
-    newUser.referralCode = referralCode;
-    newUser.analyticDate = new Date().toLocaleString();
     newUser.diamond += setting ? setting.loginBonus : 0;
-    newUser.uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
 
-    // Handle password if provided (Taka ID registration)
-    if (req.body.password) {
-        newUser.password = bcrypt.hashSync(req.body.password, 10);
-    }
+    await newUser.save();
 
-    const user = await userFunction(newUser, req.body);
-
-    // Initial wallet entry
+    // Wallet Entry
     const income = new Wallet();
-    income.userId = user._id;
+    income.userId = newUser._id;
     income.rCoin = setting ? setting.loginBonus : 0;
     income.type = 5;
     income.date = new Date().toLocaleString();
     await income.save();
 
-    const user_ = await updateLevel(user._id);
-    return res.status(200).json({ status: true, message: "Success!!", user: user_ });
+    const finalUser = await updateLevel(newUser._id);
+    const token = jwt.sign({ _id: finalUser._id, role: finalUser.role }, config.JWT_SECRET);
+
+    return res.status(200).json({ status: true, message: "Registration Success!!", user: finalUser, token });
 
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ status: false, error: error.message || "Server Error", user: {} });
+    return res.status(500).json({ status: false, error: error.message || "Server Error" });
   }
+};
+
+// Security: Link/Update methods
+exports.updateSecurity = async (req, res) => {
+    try {
+        const { userId, type, value, password } = req.body; // type: 'email', 'phone', 'password'
+        const user = await User.findById(userId);
+        if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+        if (type === 'email') {
+            const emailExist = await User.findOne({ email: value, _id: { $ne: user._id } });
+            if (emailExist) return res.status(200).json({ status: false, message: "Email already linked to another account" });
+            user.email = value;
+        } else if (type === 'password') {
+            user.password = bcrypt.hashSync(value, 10);
+        } else if (type === 'phone') {
+            // phone logic
+            user.identity = value; // or a dedicated phone field
+        }
+
+        await user.save();
+        return res.status(200).json({ status: true, message: "Security updated successfully", user });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
 };
 
 // Taka ID Custom Login
@@ -396,11 +462,26 @@ exports.updateProfile = async (req, res) => {
     //       : `${config.SERVER_PATH}storage/male.png`;
     // }
 
-    user.name = req.body.name;
-    user.username = req.body.username;
-    user.bio = req.body.bio;
-    user.gender = req.body.gender;
-    user.age = req.body.age;
+    user.name = req.body.name ? req.body.name : user.name;
+    user.username = req.body.username ? req.body.username : user.username;
+    user.bio = req.body.bio ? req.body.bio : user.bio;
+    user.gender = req.body.gender ? req.body.gender : user.gender;
+    user.age = req.body.age ? req.body.age : user.age;
+    user.country = req.body.country ? req.body.country : user.country;
+
+    if (req.body.profileSetupCompleted) {
+        user.profileSetupCompleted = req.body.profileSetupCompleted === "true";
+    }
+
+    if (req.body.dob) {
+        // Calculate age from DOB string (Expected format: DD/MM/YYYY)
+        const parts = req.body.dob.split("/");
+        if (parts.length === 3) {
+            const birthDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            const ageDate = new Date(Date.now() - birthDate.getTime());
+            user.age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        }
+    }
 
     await user.save();
 
@@ -466,6 +547,45 @@ exports.getProfileUser = async (req, res) => {
     return res
       .status(500)
       .json({ status: false, error: error.message || "Server Error" });
+  }
+};
+
+// Global Search (User + Rooms)
+exports.globalSearch = async (req, res) => {
+  try {
+    const { value, start, limit, userId } = req.body;
+    const skip = parseInt(start) || 0;
+    const limitNum = parseInt(limit) || 20;
+
+    const searchQuery = {
+      $or: [
+        { name: { $regex: value, $options: "i" } },
+        { username: { $regex: value, $options: "i" } },
+        { uniqueId: { $regex: value, $options: "i" } },
+      ],
+    };
+
+    const users = await User.find(searchQuery)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Check live status for each user
+    const userIds = users.map((u) => u._id);
+    const liveRooms = await LiveUser.find({ liveUserId: { $in: userIds } }).lean();
+
+    const results = users.map((user) => {
+      const room = liveRooms.find((r) => r.liveUserId.toString() === user._id.toString());
+      return {
+        ...user,
+        isLive: !!room,
+        roomInfo: room || null,
+      };
+    });
+
+    return res.status(200).json({ status: true, message: "Success", user: results });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
@@ -665,6 +785,21 @@ exports.referralCode = async (req, res) => {
   }
 };
 
+// get user by numeric unique ID
+exports.getByUniqueId = async (req, res) => {
+  try {
+    const { uniqueId } = req.query;
+    if (!uniqueId) return res.status(200).json({ status: false, message: "ID is required" });
+
+    const user = await User.findOne({ uniqueId: parseInt(uniqueId) }).populate("level charmLevel");
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+    return res.status(200).json({ status: true, message: "Success", user });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
 // block unblock user
 exports.blockUnblock = async (req, res) => {
   try {
@@ -790,52 +925,60 @@ exports.addLessRcoinDiamond = async (req, res) => {
         .status(200)
         .json({ status: false, message: "User does not Exist!" });
 
-    if (
-      (req.body.rCoin && parseInt(req.body.rCoin) === user.rCoin) ||
-      (req.body.diamond && parseInt(req.body.diamond) === user.diamond)
-    )
-      return res.status(200).json({ status: true, message: "Success!!", user });
+    const amount = parseInt(req.body.amount);
+    const type = req.body.type; // diamond or rCoin
+    const action = req.body.action; // add or less
+    const reason = req.body.reason || "Manual Adjustment by Owner";
+
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(200).json({ status: false, message: "Invalid Amount" });
+    }
 
     const wallet = new Wallet();
-
-    if (req.body.rCoin) {
-      if (user.rCoin > req.body.rCoin) {
-        // put entry on history in outgoing
-        wallet.isIncome = false;
-        wallet.rCoin = user.rCoin - req.body.rCoin;
-      } else {
-        // put entry on history in income
-        wallet.isIncome = true;
-        wallet.rCoin = req.body.rCoin - user.rCoin;
-      }
-      user.rCoin = req.body.rCoin;
-    }
-    if (req.body.diamond) {
-      if (user.diamond > req.body.diamond) {
-        // put entry on history in outgoing
-        wallet.isIncome = false;
-        wallet.diamond = user.diamond - req.body.diamond;
-      } else {
-        // put entry on history in income
-        wallet.isIncome = true;
-        wallet.diamond = req.body.diamond - user.diamond;
-      }
-      user.diamond = req.body.diamond;
-    }
-    await user.save();
-
     wallet.userId = user._id;
-    wallet.type = 8;
     wallet.date = new Date().toLocaleString();
+    wallet.type = 8; // Manual adjustment type
 
+    if (type === "diamond") {
+      if (action === "add") {
+        user.diamond += amount;
+        wallet.diamond = amount;
+        wallet.isIncome = true;
+      } else {
+        if (user.diamond < amount) return res.status(200).json({ status: false, message: "Insufficient Balance" });
+        user.diamond -= amount;
+        wallet.diamond = amount;
+        wallet.isIncome = false;
+      }
+    } else if (type === "rCoin") {
+      if (action === "add") {
+        user.rCoin += amount;
+        wallet.rCoin = amount;
+        wallet.isIncome = true;
+      } else {
+        if (user.rCoin < amount) return res.status(200).json({ status: false, message: "Insufficient Balance" });
+        user.rCoin -= amount;
+        wallet.rCoin = amount;
+        wallet.isIncome = false;
+      }
+    }
+
+    await user.save();
     await wallet.save();
+
+    // Create Audit Log Entry
+    const auditLog = new AuditLog({
+      adminId: req.admin?._id || null,
+      action: "WALLET_ADJUSTMENT",
+      details: `${action.toUpperCase()} ${amount} ${type} to user ${user.uniqueId}. Reason: ${reason}`,
+      ip: req.ip
+    });
+    await auditLog.save();
 
     return res.status(200).json({ status: true, message: "Success!!", user });
   } catch (error) {
     console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message || "Server Error" });
   }
 };
 
@@ -905,34 +1048,33 @@ const checkPlan = async (userId, res) => {
 };
 
 // update level of user
-const updateLevel = async (userId, res) => {
+exports.updateLevel = async (userId) => {
   try {
     const user = await User.findById(userId);
-    if (!user)
-      return res
-        .status(200)
-        .json({ status: false, message: "User does not Exist!!" });
+    if (!user) return;
 
-    const level = await Level.find().sort({
-      coin: -1,
-    });
+    const levels = await Level.find().sort({ coin: -1 });
 
-    await level.map(async (data) => {
-      if (user.spentCoin <= data.coin) {
-        return (user.level = data._id);
+    // Wealth Level (spentCoin)
+    for (let data of levels) {
+      if (user.spentCoin >= data.coin) {
+        user.level = data._id;
+        break;
       }
-    });
+    }
+
+    // Charm Level (rCoin)
+    for (let data of levels) {
+        if (user.rCoin >= data.coin) {
+          user.charmLevel = data._id;
+          break;
+        }
+    }
 
     await user.save();
-
-    const user_ = await User.findById(userId).populate("level");
-
-    return user_;
+    return await User.findById(userId).populate("level charmLevel");
   } catch (error) {
     console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
   }
 };
 
@@ -945,16 +1087,20 @@ exports.updateRole = async (req, res) => {
       return res.status(200).json({ status: false, message: "User does not Exist!!" });
     }
 
+    const oldRole = user.role;
     user.role = req.body.role;
-    if (req.body.agency) {
-        user.agency = req.body.agency;
+
+    // reset enterprise fields if changing roles significantly
+    if (["bd", "bd_leader", "agency"].includes(req.body.role)) {
+        user.region = req.body.region || user.region;
+        user.commission = req.body.commission || user.commission;
     }
 
     await user.save();
 
     return res.status(200).json({
       status: true,
-      message: "Role updated successfully!",
+      message: `User promoted from ${oldRole} to ${user.role} successfully!`,
       user,
     });
   } catch (error) {
@@ -963,20 +1109,134 @@ exports.updateRole = async (req, res) => {
   }
 };
 
-exports.IdGenerate = async (req, res) => {
+// force logout user from all devices
+exports.forceLogout = async (req, res) => {
   try {
-    const user = await User.find({});
-    user.map(async (res) => {
-      var digits = Math.floor(Math.random() * 90000000) + 10000000;
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
 
-      res.uniqueId = digits;
-      await res.save();
-    });
-    return res.status(200).json({ status: true, message: "success" });
+    user.fcmToken = ""; // Clear token so notifications stop
+    user.token = null;  // Clear session token if stored
+    user.isOnline = false;
+    await user.save();
+
+    return res.status(200).json({ status: true, message: "User forced to logout successfully" });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
+};
+
+// grant asset to user (Frame or Badge)
+exports.grantAsset = async (req, res) => {
+  try {
+    const { userId, assetId, assetType } = req.body; // assetType: 'frame' or 'badge'
+    if (!userId || !assetId || !assetType) return res.status(200).json({ status: false, message: "Missing required fields" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+    if (!user.inventory) {
+        user.inventory = { frames: [], badges: [], bubbles: [], entranceEffects: [], vehicles: [] };
+    }
+
+    if (assetType === 'frame') {
+        if (user.inventory.frames.includes(assetId)) return res.status(200).json({ status: false, message: "User already has this frame" });
+        user.inventory.frames.push(assetId);
+    } else if (assetType === 'badge') {
+        if (user.inventory.badges.includes(assetId)) return res.status(200).json({ status: false, message: "User already has this badge" });
+        user.inventory.badges.push(assetId);
+    } else {
+        return res.status(200).json({ status: false, message: "Invalid asset type" });
+    }
+
+    await user.save();
+    return res.status(200).json({ status: true, message: "Asset granted successfully", user });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// remove asset from user
+exports.removeAsset = async (req, res) => {
+  try {
+    const { userId, assetId, assetType } = req.body;
+    const user = await User.findById(userId);
+    if (!user || !user.inventory) return res.status(200).json({ status: false, message: "User or inventory not found" });
+
+    if (assetType === 'frame') {
+        user.inventory.frames = user.inventory.frames.filter(id => id.toString() !== assetId);
+    } else if (assetType === 'badge') {
+        user.inventory.badges = user.inventory.badges.filter(id => id.toString() !== assetId);
+    }
+
+    await user.save();
+    return res.status(200).json({ status: true, message: "Asset removed successfully", user });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// change user numeric ID (Special ID assignment)
+exports.changeNumericId = async (req, res) => {
+  try {
+    const { newId } = req.body;
+    if (!newId) return res.status(200).json({ status: false, message: "New ID is required" });
+
+    const idExist = await User.findOne({ uniqueId: newId });
+    if (idExist) return res.status(200).json({ status: false, message: "This ID is already assigned to someone else" });
+
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+    user.uniqueId = newId;
+    await user.save();
+
+    return res.status(200).json({ status: true, message: "Unique ID updated successfully", user });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// Enterprise: Get BD Leader List
+exports.getBDLeaderList = async (req, res) => {
+    try {
+        const bdLeaders = await User.find({ role: "bd_leader" })
+            .select("name username image uniqueId commission region lastLogin createdAt")
+            .lean();
+
+        // Enrich with counts
+        const enrichedList = await Promise.all(bdLeaders.map(async (leader) => {
+            const bdCount = await User.countDocuments({ role: "bd", bdLeaderId: leader._id });
+            return { ...leader, bdCount };
+        }));
+
+        return res.status(200).json({ status: true, message: "Success", bdLeaders: enrichedList });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// Enterprise: Get BD List
+exports.getBDList = async (req, res) => {
+    try {
+        const { bdLeaderId } = req.query;
+        let query = { role: "bd" };
+        if (bdLeaderId) query.bdLeaderId = bdLeaderId;
+
+        const bds = await User.find(query)
+            .select("name username image uniqueId commission region bdLeaderId lastLogin createdAt")
+            .populate("bdLeaderId", "name uniqueId")
+            .lean();
+
+        // Enrich with agency counts
+        const Agency = require("../agency/agency.model");
+        const enrichedList = await Promise.all(bds.map(async (bd) => {
+            const agencyCount = await Agency.countDocuments({ bdId: bd._id });
+            return { ...bd, agencyCount };
+        }));
+
+        return res.status(200).json({ status: true, message: "Success", bds: enrichedList });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
 };

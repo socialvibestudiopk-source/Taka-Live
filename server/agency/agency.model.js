@@ -2,13 +2,18 @@ const mongoose = require("mongoose");
 
 const agencySchema = new mongoose.Schema(
   {
-    name: { type: String, default: "" },
+    name: { type: String, required: true },
     image: { type: String, default: "" },
-    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" }, // Business Development link
+    bio: { type: String, default: "" },
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    bdId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Assigned Business Developer
+    whatsappNumber: { type: String },
+    country: { type: String },
     code: { type: String, unique: true },
-    commission: { type: Number, default: 0 }, // Agency percentage
-    status: { type: String, enum: ["active", "suspended"], default: "active" },
+    hostCount: { type: Number, default: 0 },
+    activeHostCount: { type: Number, default: 0 },
+    totalWork: { type: Number, default: 0 },
+    status: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false },
   },
   {

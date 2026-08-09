@@ -14,6 +14,7 @@ exports.index = async (req, res) => {
                 agoraKey: "",
                 agoraCertificate: "",
                 isAppActive: true,
+                maintenanceMessage: "Offline Mode",
                 privacyPolicyLink: "",
                 privacyPolicyText: "",
                 chatCharge: 0,
@@ -39,6 +40,7 @@ exports.index = async (req, res) => {
         setting.agoraKey = "";
         setting.agoraCertificate = "";
         setting.isAppActive = true;
+        setting.maintenanceMessage = "Server is under maintenance. Please try again later.";
         setting.privacyPolicyLink = "";
         setting.privacyPolicyText = "";
         setting.chatCharge = 0;
@@ -102,6 +104,13 @@ exports.update = async (req, res) => {
     setting.minRcoinForCashOut = req.body.minRcoinForCaseOut;
     setting.paymentGateway = req.body.paymentGateway;
     setting.loginBonus = req.body.loginBonus;
+
+    // New Executive Controls
+    setting.isAppActive = req.body.isAppActive !== undefined ? req.body.isAppActive : setting.isAppActive;
+    setting.maintenanceMessage = req.body.maintenanceMessage || setting.maintenanceMessage;
+    setting.androidVersion = req.body.androidVersion || setting.androidVersion;
+    setting.androidForceUpdate = req.body.androidForceUpdate !== undefined ? req.body.androidForceUpdate : setting.androidForceUpdate;
+    setting.androidUpdateLink = req.body.androidUpdateLink || setting.androidUpdateLink;
 
     await setting.save();
 

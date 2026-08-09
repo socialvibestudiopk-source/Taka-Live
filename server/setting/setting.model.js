@@ -21,6 +21,17 @@ const settingSchema = new mongoose.Schema(
     rCoinForCashOut: { type: Number, default: 20 },
     rCoinForDiamond: { type: Number, default: 20 },
     isAppActive: { type: Boolean, default: true },
+    maintenanceMessage: { type: String, default: "Server is under maintenance. Please try again later." },
+
+    // Force Update Controls
+    androidVersion: { type: String, default: "1.0.0" },
+    androidForceUpdate: { type: Boolean, default: false },
+    androidUpdateLink: { type: String, default: "" },
+
+    iosVersion: { type: String, default: "1.0.0" },
+    iosForceUpdate: { type: Boolean, default: false },
+    iosUpdateLink: { type: String, default: "" },
+
     paymentGateway: { type: Array, default: [] },
     minRcoinForCashOut: { type: Number, default: 200 }, // minimum rCoin for withdraw [redeem]
     freeDiamondForAd: { type: Number, default: 20 },

@@ -341,117 +341,7 @@ exports.getPopularLatestPosts = async (req, res) => {
     let likeCommentSort = {},
       popularLatestSort = {};
 
-    const FakePost = await Post.aggregate([
-      {
-        $match: {
-          isFake: true,
-          isDelete: false,
-        },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "userId",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-      {
-        $unwind: {
-          path: "$user",
-          preserveNullAndEmptyArrays: false,
-        },
-      },
-      {
-        $lookup: {
-          from: "favorites",
-          let: {
-            postId: "$_id",
-          },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ["$post", "$$postId"] },
-                    { $eq: ["$user", user._id] },
-                  ],
-                },
-              },
-            },
-          ],
-          as: "favorite",
-        },
-      },
-      {
-        $unwind: {
-          path: "$favorite",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $lookup: {
-          from: "comments",
-          as: "comment",
-          let: {
-            postId: "$_id",
-          },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $eq: ["$post", "$$postId"],
-                },
-              },
-            },
-            {
-              $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: "userId",
-              },
-            },
-            { $unwind: { path: "$userId", preserveNullAndEmptyArrays: false } },
-            { $match: { "userId.isBlock": false } },
-          ],
-        },
-      },
-      {
-        $project: {
-          userId: "$user._id",
-          name: "$user.name",
-          location: 1,
-          caption: 1,
-          date: 1,
-          post: 1,
-          allowComment: 1,
-          userImage: "$user.image",
-          like: 1,
-          comment: { $size: "$comment" },
-          isFake: 1,
-          isVIP: "$user.isVIP",
-          isLike: {
-            $cond: [{ $eq: [user._id, "$favorite.user"] }, true, false],
-          },
-        },
-      },
-      {
-        $sort: { date: -1 },
-      },
-      {
-        $facet: {
-          post: [
-            { $skip: req.query.start ? parseInt(req.query.start) : 0 }, // how many records you want to skip
-            { $limit: req.query.limit ? parseInt(req.query.limit) : 20 },
-          ],
-          // pageInfo: [
-          //   { $group: { _id: null, count: { $sum: 1 } } }, // get total records count
-          // ],
-        },
-      },
-    ]);
-
+    let matchQuery = { showPost: 0, isDelete: false, isFake: false };
 
     if (req.query.type === "popular") {
       likeCommentSort = {
@@ -459,6 +349,11 @@ exports.getPopularLatestPosts = async (req, res) => {
         comment: -1,
       };
       popularLatestSort = { isVIP: -1 };
+    } else if (req.query.type === "broadcast") {
+      const broadcasterUsers = await User.find({ role: { $in: ["host", "agency", "OFFICIAL_OWNER"] } }).distinct("_id");
+      matchQuery.userId = { $in: broadcasterUsers };
+      popularLatestSort = { sortingDate: -1 };
+      likeCommentSort = { sortingDate: -1 };
     } else {
       popularLatestSort = { sortingDate: -1 };
       likeCommentSort = { sortingDate: -1 };
@@ -466,7 +361,7 @@ exports.getPopularLatestPosts = async (req, res) => {
 
     const posts = await Post.aggregate([
       {
-        $match: { showPost: 0, isDelete: false, isFake: false },
+        $match: matchQuery,
       },
       {
         $addFields: { sortingDate: { $toDate: "$date" } },
@@ -530,6 +425,11 @@ exports.getPopularLatestPosts = async (req, res) => {
           comment: 1,
           isFake: 1,
           isVIP: "$user.isVIP",
+          role: "$user.role",
+          isVerified: "$user.isVerified",
+          postType: 1,
+          thumbnail: 1,
+          multiPost: 1,
           isLike: {
             $cond: [{ $eq: [user._id, "$favorite.user"] }, true, false],
           },
@@ -681,6 +581,11 @@ exports.getFollowingPosts = async (req, res) => {
           like: "$post.like",
           comment: "$post.comment",
           isVIP: "$user.isVIP",
+          role: "$user.role",
+          isVerified: "$user.isVerified",
+          postType: "$post.postType",
+          thumbnail: "$post.thumbnail",
+          multiPost: "$post.multiPost",
           isLike: {
             $cond: [{ $eq: [user._id, "$favorite.user"] }, true, false],
           },
@@ -799,6 +704,11 @@ exports.getUserPosts = async (req, res) => {
           like: 1,
           comment: 1,
           isVIP: "$user.isVIP",
+          role: "$user.role",
+          isVerified: "$user.isVerified",
+          postType: 1,
+          thumbnail: 1,
+          multiPost: 1,
           isLike: {
             $cond: [{ $eq: [user._id, "$favorite.user"] }, true, false],
           },

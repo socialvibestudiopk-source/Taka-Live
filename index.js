@@ -10,6 +10,33 @@ const config = require("./config");
 const http = require("http");
 const server = http.createServer(app);
 const io = require("socket.io")(server);
+require("./server/socket/socket")(io);
+
+// real-time system stats for owner panel
+io.on("connection", (socket) => {
+    console.log("Socket connected for stats:", socket.id);
+
+    const sendStats = async () => {
+        const stats = {
+            onlineUsers: await User.countDocuments({ isOnline: true }),
+            liveRooms: await LiveUser.countDocuments({}),
+            totalRevenue: 0, // Logic for revenue calculation
+            pendingWithdraw: await Wallet.countDocuments({ type: 7, status: "pending" }), // assuming wallet structure
+            todayRegistration: await User.countDocuments({
+                createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
+            })
+        };
+        socket.emit("statsUpdate", stats);
+    };
+
+    // Send immediately and then every 30 seconds
+    sendStats();
+    const interval = setInterval(sendStats, 30000);
+
+    socket.on("disconnect", () => {
+        clearInterval(interval);
+    });
+});
 
 // Centralized Services
 const firebaseService = require("./services/firebaseService");
@@ -21,7 +48,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 // method
-const { offlineUser } = require("./server/user/user.controller");
+const { offlineUser, updateLevel } = require("./server/user/user.controller");
+const { generateCommission } = require("./server/commission/commissionEngine");
 
 // model
 const Wallet = require("./server/wallet/wallet.model");
@@ -43,6 +71,14 @@ app.use("/admin", AdminRoute);
 const OwnerRoute = require("./server/owner/owner.route");
 app.use("/owner", OwnerRoute);
 
+// commission route
+const CommissionRoute = require("./server/commission/commission.route");
+app.use("/commission", CommissionRoute);
+
+// asset route
+const AssetRoute = require("./server/asset/asset.route");
+app.use("/asset", AssetRoute);
+
 //banner route
 const BannerRoute = require("./server/banner/banner.route");
 app.use("/banner", BannerRoute);
@@ -54,6 +90,9 @@ app.use("/coinPlan", CoinPlanRoute);
 //vipPlan route
 const VIPPlanRoute = require("./server/vipPlan/vipPlan.route");
 app.use("/vipPlan", VIPPlanRoute);
+
+const VIPManagementRoute = require("./server/vipPlan/vipManagement.route");
+app.use("/vipManagement", VIPManagementRoute);
 
 //gift category route
 const GiftCategoryRoute = require("./server/giftCategory/giftCategory.route");
@@ -162,6 +201,10 @@ app.use("/report", ReportRoute);
 const StickerRoute = require("./server/sticker/sticker.route");
 app.use("/sticker", StickerRoute);
 
+// super admin route
+const SuperAdminRoute = require("./server/superAdmin/superAdmin.route");
+app.use("/superAdmin", SuperAdminRoute);
+
 // frame route
 const FrameRoute = require("./server/frame/frame.route");
 app.use("/frame", FrameRoute);
@@ -189,6 +232,30 @@ app.use("/recharge", RechargeRoute);
 // auditLog route
 const AuditLogRoute = require("./server/auditLog/auditLog.route");
 app.use("/auditLog", AuditLogRoute);
+
+// invitation route
+const InvitationRoute = require("./server/invitation/invitation.route");
+app.use("/invitation", InvitationRoute);
+
+// family route
+const FamilyRoute = require("./server/family/family.route");
+app.use("/family", FamilyRoute);
+
+// commission route
+const CommissionRoute = require("./server/commission/commission.route");
+app.use("/commission", CommissionRoute);
+
+// asset route
+const AssetRoute = require("./server/asset/asset.route");
+app.use("/asset", AssetRoute);
+
+// host/agency route
+const HostAgencyRoute = require("./server/host/hostAgency.route");
+app.use("/hostAgency", HostAgencyRoute);
+
+// finance route
+const FinanceRoute = require("./server/finance/finance.route");
+app.use("/finance", FinanceRoute);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", db: mongoose.connection.readyState });
@@ -524,27 +591,55 @@ io.on("connect", (socket) => {
         receiverUser.rCoin += data.coin;
         await receiverUser.save();
 
-        const liveUser = await LiveUser.findOne({
-          liveUserId: receiverUser._id,
-        });
-        liveUser.rCoin += data.coin;
-        await liveUser.save();
+        await updateLevel(receiverUser._id);
+        await updateLevel(senderUser._id);
 
-        // console.log("updated liveUser in gift send", liveUser);
-
-        // console.log("receiverUser in Gift send", receiverUser);
-
-        const income = new Wallet();
-        income.userId = receiverUser._id;
-        income.rCoin = data.coin;
-        income.type = 0;
-        income.isIncome = true;
-        income.otherUserId = senderUser._id;
-        income.date = new Date().toLocaleString("en-US", {
-          timeZone: "Asia/Kolkata",
+        // Authoritative Commission Generation (Recursive Chain)
+        // 1. Host Commission
+        await generateCommission({
+            userId: receiverUser._id,
+            role: "HOST",
+            grossAmount: data.coin,
+            sourceType: "GIFT",
+            sourceId: income._id
         });
 
-        await income.save();
+        // 2. Agency Commission (40% of Host work by default, or configured rate)
+        if (receiverUser.agencyId) {
+            const agency = await User.findOne({ agencyId: receiverUser.agencyId, role: "AGENCY" });
+            if (agency) {
+                await generateCommission({
+                    userId: agency._id,
+                    role: "AGENCY",
+                    grossAmount: data.coin,
+                    sourceType: "GIFT",
+                    sourceId: income._id
+                });
+
+                // 3. BD Commission (10% of Agency work by default)
+                if (agency.bdId) {
+                    await generateCommission({
+                        userId: agency.bdId,
+                        role: "BD",
+                        grossAmount: data.coin,
+                        sourceType: "GIFT",
+                        sourceId: income._id
+                    });
+
+                    // 4. BD Leader Commission
+                    const bd = await User.findById(agency.bdId);
+                    if (bd && bd.bdLeaderId) {
+                        await generateCommission({
+                            userId: bd.bdLeaderId,
+                            role: "BD_LEADER",
+                            grossAmount: data.coin,
+                            sourceType: "GIFT",
+                            sourceId: income._id
+                        });
+                    }
+                }
+            }
+        }
       }
 
       if (liveStreamingHistory) {

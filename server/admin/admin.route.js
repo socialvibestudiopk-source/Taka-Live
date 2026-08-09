@@ -49,4 +49,9 @@ router.post("/sendEmail", AdminController.forgotPassword);
 //change password
 router.post("/setPassword/:adminId", AdminController.setPassword);
 
+// Staff Management
+router.get("/getStaff", AdminMiddleware, AdminController.getStaff);
+router.patch("/updateRole/:id", AdminMiddleware, AdminController.updateRole);
+router.delete("/:id", AdminMiddleware, AdminController.destroy);
+
 module.exports = router;

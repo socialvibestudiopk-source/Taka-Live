@@ -709,53 +709,45 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-exports.setPassword = async (req, res, next) => {
+// get all admin [Staff]
+exports.getStaff = async (req, res) => {
   try {
-    if (req.body.newPass || req.body.confirmPass) {
-      Admin.findOne({ _id: req.params.adminId }).exec(async (err, admin) => {
-        if (err)
-          return res.status(200).json({ status: false, message: err.message });
-        else {
-          if (req.body.newPass !== req.body.confirmPass) {
-            return res.status(200).json({
-              status: false,
-              message: "Oops ! New Password and Confirm Password doesn't match",
-            });
-          }
-          bcrypt.hash(req.body.newPass, 10, (err, hash) => {
-            if (err)
-              return res.status(200).json({
-                status: false,
-                message: err.message,
-              });
-            else {
-              Admin.update(
-                { _id: req.params.adminId },
-                { $set: { password: hash } }
-              ).exec((error, updated) => {
-                if (error)
-                  return res.status(200).json({
-                    status: false,
-                    message: error.message,
-                  });
-                else
-                  res.status(200).json({
-                    status: true,
-                    message: "Password Reset Successfully",
-                  });
-              });
-            }
-          });
-        }
-      });
-    } else
-      return res
-        .status(200)
-        .send({ status: false, message: "Invalid details!" });
+    const staff = await Admin.find().select("-password -purchaseCode");
+    return res.status(200).json({ status: true, message: "Success", staff });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "server error" });
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// update staff role
+exports.updateRole = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.params.id);
+    if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
+
+    admin.role = req.body.role || admin.role;
+    await admin.save();
+
+    return res.status(200).json({ status: true, message: "Role updated successfully", staff: admin });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// delete staff
+exports.destroy = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.params.id);
+    if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
+
+    // Protect Owner from being deleted
+    if (admin.email === "socialvibestudiopk@gmail.com") {
+      return res.status(200).json({ status: false, message: "System Owner cannot be deleted" });
+    }
+
+    await admin.deleteOne();
+    return res.status(200).json({ status: true, message: "Staff Deleted Successfully" });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
