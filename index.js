@@ -6,7 +6,16 @@ const path = require("path");
 const cors = require("cors");
 const config = require("./config");
 
-//socket io
+// model
+const Wallet = require("./server/wallet/wallet.model");
+const User = require("./server/user/user.model");
+const Follower = require("./server/follower/follower.model");
+const LiveUser = require("./server/liveUser/liveUser.model");
+const Chat = require("./server/chat/chat.model");
+const ChatTopic = require("./server/chatTopic/chatTopic.model");
+const LiveStreamingHistory = require("./server/liveStreamingHistory/liveStreamingHistory.model");
+
+// socket io
 const http = require("http");
 const server = http.createServer(app);
 const io = require("socket.io")(server);
@@ -16,16 +25,20 @@ io.on("connection", (socket) => {
     console.log("Socket connected for stats:", socket.id);
 
     const sendStats = async () => {
-        const stats = {
-            onlineUsers: await User.countDocuments({ isOnline: true }),
-            liveRooms: await LiveUser.countDocuments({}),
-            totalRevenue: 0, // Logic for revenue calculation
-            pendingWithdraw: await Wallet.countDocuments({ type: 7, status: "pending" }), // assuming wallet structure
-            todayRegistration: await User.countDocuments({
-                createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
-            })
-        };
-        socket.emit("statsUpdate", stats);
+        try {
+            const stats = {
+                onlineUsers: await User.countDocuments({ isOnline: true }),
+                liveRooms: await LiveUser.countDocuments({}),
+                totalRevenue: 0, // Logic for revenue calculation
+                pendingWithdraw: await Wallet.countDocuments({ type: 7, status: "pending" }).catch(() => 0),
+                todayRegistration: await User.countDocuments({
+                    createdAt: { $gte: new Date(new Date().setHours(0,0,0,0)) }
+                })
+            };
+            socket.emit("statsUpdate", stats);
+        } catch (err) {
+            console.error("Error sending stats via socket:", err.message);
+        }
     };
 
     // Send immediately and then every 30 seconds
@@ -37,30 +50,10 @@ io.on("connection", (socket) => {
     });
 });
 
-// Centralized Services
-const firebaseService = require("./services/firebaseService");
-
-app.use(cors());
-app.use(express.json());
-
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/storage", express.static(path.join(__dirname, "storage")));
-
-// method
-const { offlineUser, updateLevel } = require("./server/user/user.controller");
-const { generateCommission } = require("./server/commission/commissionEngine");
-
-// model
-const Wallet = require("./server/wallet/wallet.model");
-const User = require("./server/user/user.model");
-const Follower = require("./server/follower/follower.model");
-const LiveUser = require("./server/liveUser/liveUser.model");
-const Chat = require("./server/chat/chat.model");
-const ChatTopic = require("./server/chatTopic/chatTopic.model");
-const LiveStreamingHistory = require("./server/liveStreamingHistory/liveStreamingHistory.model");
-
 //FCM node
 const fcm = require("./util/fcm");
+const { generateCommission } = require("./server/commission/commissionEngine");
+const { updateLevel, offlineUser } = require("./server/user/user.controller");
 
 // Routes
 app.use("/admin", require("./server/admin/admin.route"));
@@ -114,7 +107,7 @@ app.use("/", require("./server/login/login.route"));
 app.use("/", require("./server/notification/notification.route"));
 
 app.get("/health", (req, res) => {
-  const firebaseStatus = firebaseService.isInitialized ? "ACTIVE" : "DISABLED";
+  const firebaseStatus = fcm.isInitialized ? "ACTIVE" : "DISABLED";
   res.status(200).json({
     status: "OK",
     uptime: process.uptime(),
@@ -196,8 +189,20 @@ const liveRouter = require(_0x372bd5(0x123) +
 app[_0x372bd5(0x124)](_0x372bd5(0x12b), liveRouter);
 
 //public index.html file
-app.get("/*", function (req, res) {
-  res.status(200).sendFile(path.join(__dirname, "public", "index.html"));
+// Serve owner panel static build (if present) under /admin
+const ownerPanelPath = process.env.OWNER_PANEL_PATH || path.join(__dirname, '..', '..', '..', 'Taka-Live-Owner-Panel', 'dist');
+try {
+  app.use('/admin', express.static(ownerPanelPath));
+  app.get('/admin/*', function (req, res) {
+    res.status(200).sendFile(path.join(ownerPanelPath, 'index.html'));
+  });
+} catch (err) {
+  console.warn('Owner panel static serve not configured or path missing:', ownerPanelPath);
+}
+
+// Fallback to public index.html for other routes
+app.get('/*', function (req, res) {
+  res.status(200).sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 //mongodb connection
@@ -209,10 +214,23 @@ mongoose.connect(process.env.MONGODB_URI, {
 
   // Seed Owner Admin
   const Admin = require("./server/admin/admin.model");
+  const Permission = require("./server/permission/permission.model");
   const seedAssets = require("./util/seedAssets");
   const bcrypt = require("bcryptjs");
 
   await seedAssets();
+
+  // Seed Basic Permissions
+  const perms = [
+    { name: "users.view", category: "Users" },
+    { name: "users.ban", category: "Users" },
+    { name: "finance.view", category: "Finance" },
+    { name: "agency.invite", category: "Agency" },
+    { name: "bd.invite", category: "BD" }
+  ];
+  for (let p of perms) {
+    await Permission.findOneAndUpdate({ name: p.name }, p, { upsert: true });
+  }
 
   const ownerEmail = "socialvibestudiopk@gmail.com";
   const ownerPassword = "(hmh874)";

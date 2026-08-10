@@ -1,6 +1,7 @@
 const User = require("../user/user.model");
 const Agency = require("../agency/agency.model");
 const AgencyApplication = require("./agencyApplication.model");
+const AgencyInvitation = require("../invitation/agencyInvitation.model");
 const SalaryPolicy = require("./salaryPolicy.model");
 const TargetPolicy = require("./targetPolicy.model");
 

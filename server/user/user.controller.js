@@ -6,7 +6,7 @@ const Wallet = require("../wallet/wallet.model");
 const Level = require("../level/level.model");
 const LiveUser = require("../liveUser/liveUser.model");
 const AuditLog = require("../auditLog/auditLog.model");
-const { admin } = require("../../services/firebaseService");
+const { admin, isInitialized: isFirebaseInitialized } = require("../../services/firebaseService");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -184,7 +184,7 @@ exports.loginSignup = async (req, res) => {
       return res.status(200).json({ status: false, message: "Invalid Details!", user: {} });
 
     // Optional: Verify Google ID Token if provided
-    if (loginType == 0 && idToken) {
+    if (loginType == 0 && idToken && isFirebaseInitialized) {
         try {
             const decodedToken = await admin.auth().verifyIdToken(idToken);
             if (decodedToken.email !== email) throw new Error("Token mismatch");
@@ -853,7 +853,7 @@ exports.offlineUser = async (userId) => {
     const user = await User.findById(userId);
 
     if (user) {
-      // user.isOnline = false;
+      user.isOnline = false;
       user.isBusy = false;
       user.token = null;
       user.channel = null;
