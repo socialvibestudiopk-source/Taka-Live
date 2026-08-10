@@ -6,6 +6,10 @@ const path = require("path");
 const cors = require("cors");
 const config = require("./config");
 
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // model
 const Wallet = require("./server/wallet/wallet.model");
 const User = require("./server/user/user.model");
