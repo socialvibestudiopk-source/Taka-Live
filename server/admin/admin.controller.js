@@ -124,6 +124,13 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (!admin.password) {
+        return res.status(200).json({
+            status: false,
+            message: "Oops! Password not set for this admin account. Contact support.",
+        });
+    }
+
     const isPassword = bcrypt.compareSync(req.body.password, admin.password);
     if (!isPassword) {
       return res.status(200).json({
@@ -132,29 +139,33 @@ exports.login = async (req, res) => {
       });
     }
 
-    // FORCE OWNER ROLE for the Official Email
-    if (admin.email === "socialvibestudiopk@gmail.com") {
+    // Ensure role is set for the Official Owner
+    if (admin.email === "socialvibestudiopk@gmail.com" && admin.role !== "OWNER") {
         admin.role = "OWNER";
         await admin.save();
     }
 
     const payload = {
-      _id: admin._id,
+      _id: admin._id.toString(), // Standard format
       name: admin.name,
       email: admin.email,
-      image: admin.image,
       role: admin.role,
       flag: admin.flag,
     };
 
     const token = jwt.sign(payload, config.JWT_SECRET);
 
-    return res.status(200).json({ status: true, message: "Success!!", token, admin: payload });
+    return res.status(200).json({
+        status: true,
+        message: "Success!!",
+        token: token,
+        admin: payload
+    });
   } catch (error) {
-    console.log(error);
+    console.error("ADMIN LOGIN ERROR:", error);
     return res
       .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+      .json({ status: false, error: error.message || "Internal Server Error" });
   }
 };
 

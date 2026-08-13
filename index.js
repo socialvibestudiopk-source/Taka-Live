@@ -9,6 +9,7 @@ const config = require("./config");
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 // model
 const Wallet = require("./server/wallet/wallet.model");
@@ -92,6 +93,8 @@ app.use("/withdraw", require("./server/withdraw/withdraw.route"));
 app.use("/recharge", require("./server/recharge/recharge.route"));
 app.use("/auditLog", require("./server/auditLog/auditLog.route"));
 app.use("/invitation", require("./server/invitation/invitation.route"));
+app.use("/permission", require("./server/permission/permission.route"));
+app.use("/game", require("./server/luckyDraw/game.route"));
 app.use("/family", require("./server/family/family.route"));
 app.use("/hostAgency", require("./server/host/hostAgency.route"));
 app.use("/finance", require("./server/finance/finance.route"));
@@ -253,12 +256,15 @@ mongoose.connect(process.env.MONGODB_URI, {
       await newAdmin.save();
       console.log("✓ SEED: Owner Admin created successfully");
     } else {
-      // Update license and role if needed
+      // Update license, role and ENSURE PASSWORD exists
       adminExist.purchaseCode = ownerLicense;
       adminExist.role = "OWNER";
       adminExist.flag = true;
+      if (!adminExist.password) {
+          adminExist.password = ownerPassword;
+      }
       await adminExist.save();
-      console.log("✓ SEED: Owner Admin already exists, updated license and role");
+      console.log("✓ SEED: Owner Admin already exists, updated license, role and verified password");
     }
   } catch (err) {
     console.error("✖ SEED: Error creating owner admin:", err.message);

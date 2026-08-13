@@ -102,15 +102,16 @@ exports.update = async (req, res) => {
     setting.rCoinForCashOut = req.body.rCoinForCaseOut;
     setting.rCoinForDiamond = req.body.rCoinForDiamond;
     setting.minRcoinForCashOut = req.body.minRcoinForCaseOut;
-    setting.paymentGateway = req.body.paymentGateway;
-    setting.loginBonus = req.body.loginBonus;
+    setting.paymentGateway = req.body.paymentGateway || setting.paymentGateway;
+    setting.loginBonus = req.body.loginBonus || setting.loginBonus;
 
     // New Executive Controls
-    setting.isAppActive = req.body.isAppActive !== undefined ? req.body.isAppActive : setting.isAppActive;
-    setting.maintenanceMessage = req.body.maintenanceMessage || setting.maintenanceMessage;
-    setting.androidVersion = req.body.androidVersion || setting.androidVersion;
-    setting.androidForceUpdate = req.body.androidForceUpdate !== undefined ? req.body.androidForceUpdate : setting.androidForceUpdate;
-    setting.androidUpdateLink = req.body.androidUpdateLink || setting.androidUpdateLink;
+    if (req.body.isAppActive !== undefined) setting.isAppActive = req.body.isAppActive;
+    if (req.body.maintenanceMessage !== undefined) setting.maintenanceMessage = req.body.maintenanceMessage;
+    if (req.body.androidVersion !== undefined) setting.androidVersion = req.body.androidVersion;
+    if (req.body.androidForceUpdate !== undefined) setting.androidForceUpdate = req.body.androidForceUpdate;
+    if (req.body.androidUpdateLink !== undefined) setting.androidUpdateLink = req.body.androidUpdateLink;
+    if (req.body.locationApiKey !== undefined) setting.locationApiKey = req.body.locationApiKey;
 
     await setting.save();
 

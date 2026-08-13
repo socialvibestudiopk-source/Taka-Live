@@ -468,6 +468,13 @@ exports.updateProfile = async (req, res) => {
     user.age = req.body.age ? req.body.age : user.age;
     user.country = req.body.country ? req.body.country : user.country;
 
+    if (req.body.role) {
+        user.role = req.body.role;
+    }
+    if (req.body.isVerified !== undefined) {
+        user.isVerified = req.body.isVerified === "true" || req.body.isVerified === true;
+    }
+
     if (req.body.profileSetupCompleted) {
         user.profileSetupCompleted = req.body.profileSetupCompleted === "true";
     }
@@ -484,7 +491,15 @@ exports.updateProfile = async (req, res) => {
 
     await user.save();
 
-    return res.status(200).json({ status: true, message: "Success!!", user });
+    const data = await User.findById(user._id).populate("level");
+
+    // Add extra computed fields for mobile app compatibility
+    const responseUser = data.toObject();
+    responseUser.isCoinSeller = data.role === "coins_seller";
+    responseUser.isAgency = data.role === "agency";
+    responseUser.isHost = data.role === "host";
+
+    return res.status(200).json({ status: true, message: "Success!!", user: responseUser });
   } catch (error) {
     console.log(error);
     return res.status(500).json({
@@ -494,6 +509,24 @@ exports.updateProfile = async (req, res) => {
     });
   }
 };
+
+// get user profile
+exports.getProfile = async (req, res) => {
+    try {
+        const userId = req.query.userId || req.user._id;
+        const user = await User.findById(userId).populate("level");
+        if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+        const data = user.toObject();
+        data.isCoinSeller = user.role === "coins_seller";
+        data.isAgency = user.role === "agency";
+        data.isHost = user.role === "host";
+
+        return res.status(200).json({ status: true, message: "Success", user: data });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+}
 
 // get user profile of post[feed]
 exports.getProfileUser = async (req, res) => {

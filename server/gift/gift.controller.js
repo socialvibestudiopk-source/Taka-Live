@@ -72,12 +72,20 @@ exports.store = async (req, res) => {
         .status(200)
         .json({ status: false, message: "Category does not Exist!" });
 
-    const gift = req.files.map((gift) => ({
-      image: gift.path,
-      coin: req.body.coin,
-      category: category._id,
-      type: gift.mimetype === "image/gif" ? 1 : 0,
-    }));
+    const gift = req.files.map((gift) => {
+        let type = 0;
+        if (gift.mimetype === "image/gif") type = 1;
+        if (gift.originalname.endsWith('.svga')) type = 2;
+
+        return {
+            name: req.body.name || gift.originalname.split('.')[0],
+            image: gift.path,
+            coin: req.body.coin,
+            category: category._id,
+            type: type,
+            isLucky: req.body.isLucky === 'true'
+        };
+    });
 
     const gifts = await Gift.insertMany(gift);
 
@@ -113,11 +121,19 @@ exports.update = async (req, res) => {
       if (fs.existsSync(gift.image)) {
         fs.unlinkSync(gift.image);
       }
-      gift.type = req.file.mimetype === "image/gif" ? 1 : 0;
+      let type = 0;
+      if (req.file.mimetype === "image/gif") type = 1;
+      if (req.file.originalname.endsWith('.svga')) type = 2;
+
+      gift.type = type;
       gift.image = req.file.path;
     }
-    gift.coin = req.body.coin;
-    gift.category = req.body.category && req.body.category;
+    gift.name = req.body.name || gift.name;
+    gift.coin = req.body.coin || gift.coin;
+    gift.category = req.body.category || gift.category;
+    if (req.body.isLucky !== undefined) {
+        gift.isLucky = req.body.isLucky === 'true' || req.body.isLucky === true;
+    }
 
     await gift.save();
 
