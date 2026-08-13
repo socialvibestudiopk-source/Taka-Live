@@ -6,7 +6,14 @@ const path = require("path");
 const cors = require("cors");
 const config = require("./config");
 
-app.use(cors());
+const corsOptions = {
+  origin: ["https://taka-live-owner-panel.vercel.app", "http://localhost:5173"], // Specific Vercel URL
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  allowedHeaders: ["Content-Type", "Authorization", "key"]
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/storage", express.static(path.join(__dirname, "storage")));
@@ -114,14 +121,10 @@ app.use("/", require("./server/login/login.route"));
 app.use("/", require("./server/notification/notification.route"));
 
 app.get("/health", (req, res) => {
-  const firebaseStatus = fcm.isInitialized ? "ACTIVE" : "DISABLED";
   res.status(200).json({
     status: "OK",
-    uptime: process.uptime(),
     db: mongoose.connection.readyState === 1 ? "CONNECTED" : "DISCONNECTED",
-    firebase: firebaseStatus,
-    version: "1.2.0-master",
-    environment: process.env.NODE_ENV || "production"
+    time: new Date().toISOString()
   });
 });
 
