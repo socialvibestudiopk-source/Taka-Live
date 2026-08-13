@@ -3,6 +3,14 @@ const Agency = require("../agency/agency.model");
 const AgencyInvitation = require("../invitation/agencyInvitation.model");
 const BDInvitation = require("../invitation/bdInvitation.model");
 const Wallet = require("../wallet/wallet.model");
+const prisma = require("../../prisma");
+
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
 
 // Unified BD Center Dashboard
 exports.getDashboard = async (req, res) => {
@@ -10,6 +18,33 @@ exports.getDashboard = async (req, res) => {
     const user = req.user;
     const stats = {};
 
+    // --- PRISMA (SUPABASE) ---
+    try {
+        const sUser = await prisma.user.findUnique({ where: { id: user.id || user._id.toString() } });
+        if (sUser) {
+            if (sUser.role === "bd" || sUser.role === "bd_leader") {
+                stats.totalAgencies = await prisma.agency.count({ where: { bd_id: sUser.id } });
+                stats.activeAgencies = await prisma.agency.count({ where: { bd_id: sUser.id, status: true } });
+                stats.pendingAgencyInvites = await prisma.agencyInvitation.count({ where: { bd_id: sUser.id, status: "PENDING" } });
+                stats.totalWork = 0;
+                stats.commission = sUser.commission || 0;
+            }
+
+            if (sUser.role === "bd_leader") {
+                stats.totalBDs = await prisma.user.count({ where: { bd_leader_id: sUser.id, role: "bd" } });
+                stats.activeBDs = await prisma.user.count({ where: { bd_leader_id: sUser.id, role: "bd", is_block: false } });
+                stats.pendingBDInvites = await prisma.bDInvitation.count({ where: { leader_id: sUser.id, status: "PENDING" } });
+
+                const bds = await prisma.user.findMany({ where: { bd_leader_id: sUser.id }, select: { id: true } });
+                const bdIds = bds.map(b => b.id);
+                stats.teamAgencies = await prisma.agency.count({ where: { bd_id: { in: bdIds } } });
+                stats.teamWork = 0;
+            }
+            return res.status(200).json({ status: true, stats: serialize(stats), role: sUser.role, source: "Prisma" });
+        }
+    } catch (e) { console.warn("Prisma Dashboard Error:", e.message); }
+
+    // --- MONGO FALLBACK ---
     if (user.role === "bd" || user.role === "bd_leader") {
         // BD specific stats
         stats.totalAgencies = await Agency.countDocuments({ bdId: user._id });
@@ -31,7 +66,7 @@ exports.getDashboard = async (req, res) => {
         stats.teamWork = 0;
     }
 
-    return res.status(200).json({ status: true, stats, role: user.role });
+    return res.status(200).json({ status: true, stats, role: user.role, source: "Legacy" });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
@@ -41,6 +76,21 @@ exports.getDashboard = async (req, res) => {
 exports.searchUser = async (req, res) => {
   try {
     const { uniqueId, type } = req.query; // type: 'bd' or 'agency'
+
+    // Try Prisma
+    const sUser = await prisma.user.findUnique({
+        where: { unique_id: BigInt(uniqueId) },
+        select: { name: true, username: true, image: true, unique_id: true, role: true, is_block: true, bd_id: true, bd_leader_id: true }
+    });
+
+    if (sUser) {
+        if (sUser.is_block) return res.status(200).json({ status: false, message: "User is banned" });
+        if (type === 'agency' && sUser.role === "agency") return res.status(200).json({ status: false, message: "User is already an Agency" });
+        if (type === 'bd' && (sUser.role === "bd" || sUser.role === "bd_leader")) return res.status(200).json({ status: false, message: "User is already a BD/Leader" });
+
+        return res.status(200).json({ status: true, user: serialize(sUser) });
+    }
+
     const user = await User.findOne({ uniqueId: parseInt(uniqueId) })
         .select("name username image uniqueId role isBlock bdId bdLeaderId");
 
@@ -68,8 +118,29 @@ exports.sendBDInvitation = async (req, res) => {
         return res.status(403).json({ status: false, message: "Only BD Leaders can invite BDs" });
     }
     const { targetUserId } = req.body;
-    const leaderId = req.user._id;
+    const leaderId = req.user.id || req.user._id.toString();
 
+    // Try Prisma
+    try {
+        const existing = await prisma.bDInvitation.findFirst({
+            where: { leader_id: leaderId, target_user_id: targetUserId, status: "PENDING" }
+        });
+        if (existing) return res.status(200).json({ status: false, message: "Invitation already pending (Prisma)" });
+
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + 3);
+
+        await prisma.bDInvitation.create({
+            data: {
+                leader_id: leaderId,
+                target_user_id: targetUserId,
+                expires_at: expiry
+            }
+        });
+        return res.status(200).json({ status: true, message: "BD Invitation sent successfully (Prisma)" });
+    } catch (e) { console.warn("Prisma BD Invite Error:", e.message); }
+
+    // Legacy Fallback
     const existing = await BDInvitation.findOne({ leaderId, targetUserId, status: "PENDING" });
     if (existing) return res.status(200).json({ status: false, message: "Invitation already pending" });
 

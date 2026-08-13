@@ -1,9 +1,17 @@
 const Invitation = require("./invitation.model");
 const User = require("../user/user.model");
+const prisma = require("../../prisma");
 const Admin = require("../admin/admin.model");
 const Notification = require("../notification/notification.model");
 const crypto = require("crypto");
 const dayjs = require("dayjs");
+
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
 
 exports.inviteRole = async (req, res) => {
     try {
@@ -13,10 +21,46 @@ exports.inviteRole = async (req, res) => {
             return res.status(200).json({ status: false, message: "Role and User ID are required" });
         }
 
+        // --- PRISMA (SUPABASE) ---
+        try {
+            const sUser = await prisma.user.findUnique({ where: { id: userId } });
+            if (sUser) {
+                const existingInvite = await prisma.invitation.findFirst({
+                    where: { user_id: userId, role, status: "PENDING", expiry_date: { gt: new Date() } }
+                });
+
+                if (existingInvite) {
+                    return res.status(200).json({ status: false, message: `A pending invitation for ${role} already exists (Prisma)` });
+                }
+
+                const token = crypto.randomBytes(32).toString("hex");
+                const invitation = await prisma.invitation.create({
+                    data: {
+                        token,
+                        role,
+                        user_id: userId,
+                        name: sUser.name,
+                        contact: sUser.email,
+                        commission: Number(commission) || 0,
+                        region,
+                        message,
+                        bd_leader_id: bdLeaderId,
+                        bd_id: bdId,
+                        agency_id: agencyId,
+                        sender_id: req.admin?.id || req.admin?._id?.toString(),
+                        sender_role: req.admin?.role,
+                        expiry_date: dayjs().add(expiryDays, 'day').toDate()
+                    }
+                });
+
+                return res.status(200).json({ status: true, message: "Invitation sent (Prisma)", invitation: serialize(invitation) });
+            }
+        } catch (e) { console.warn("Prisma Invitation Error:", e.message); }
+
+        // --- MONGO FALLBACK ---
         const user = await User.findById(userId);
         if (!user) return res.status(200).json({ status: false, message: "User not found" });
 
-        // Prevent duplicate pending invitations for the same role
         const existingInvite = await Invitation.findOne({
             userId,
             role,
@@ -58,13 +102,7 @@ exports.inviteRole = async (req, res) => {
         notification.date = new Date().toISOString();
         await notification.save();
 
-        // TODO: Trigger Push Notification (FCM) here if needed
-
-        return res.status(200).json({
-            status: true,
-            message: "Invitation sent successfully",
-            invitation
-        });
+        return res.status(200).json({ status: true, message: "Invitation sent successfully", invitation });
 
     } catch (error) {
         console.error(error);
@@ -74,14 +112,24 @@ exports.inviteRole = async (req, res) => {
 
 exports.getInvitations = async (req, res) => {
     try {
+        // Try Prisma
+        const sInvitations = await prisma.invitation.findMany({
+            include: { user: { select: { name: true, username: true, image: true, unique_id: true } } },
+            orderBy: { created_at: 'desc' }
+        });
+
+        if (sInvitations && sInvitations.length > 0) {
+            return res.status(200).json({ status: true, message: "Success (Prisma)", invitations: serialize(sInvitations) });
+        }
+
         const invitations = await Invitation.find()
             .populate("userId", "name username image uniqueId")
             .populate("senderId", "name email")
             .sort({ createdAt: -1 });
 
-        return res.status(200).json({ status: true, message: "Success", invitations });
+        return res.status(200).json({ status: true, message: "Success (Legacy)", invitations });
     } catch (error) {
-        return res.status(500).json({ status: false, message: error.message });
+        return res.status(500).json({ status: false, error: error.message });
     }
 };
 

@@ -1,4 +1,7 @@
 const User = require("./user.model");
+const supabase = require("../../supabase"); // Supabase Client
+const prisma = require("../../prisma"); // Prisma Client
+const sql = require("../../db"); // Direct Postgres Client
 const Follower = require("../follower/follower.model");
 const Setting = require("../setting/setting.model");
 const VIPPlan = require("../vipPlan/vipPlan.model");
@@ -17,15 +20,43 @@ const deleteFile = require("../../util/deleteFile");
 const { compressImage } = require("../../util/compressImage");
 const shuffleArray = require("shuffle-array");
 
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
+
 // get staff list (Enterprise Owner Panel)
 exports.getStaffList = async (req, res) => {
   try {
     const staffRoles = ["super_admin", "admin", "agency", "bd", "bd_leader", "coins_seller", "manager", "OFFICIAL_OWNER"];
-    const staff = await User.find({ role: { $in: staffRoles } })
+
+    // 1. Try Prisma (Supabase)
+    const staff = await prisma.user.findMany({
+        where: { role: { in: staffRoles } },
+        select: {
+            name: true,
+            username: true,
+            role: true,
+            image: true,
+            last_login: true,
+            is_block: true,
+            unique_id: true
+        },
+        orderBy: { created_at: 'desc' }
+    });
+
+    if (staff && staff.length > 0) {
+       return res.status(200).json({ status: true, message: "Success (Prisma)", staff: serialize(staff) });
+    }
+
+    // 2. Fallback to MongoDB
+    const mongoStaff = await User.find({ role: { $in: staffRoles } })
       .select("name username role image lastLogin isBlock uniqueId")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ status: true, message: "Success", staff });
+    return res.status(200).json({ status: true, message: "Success (Legacy)", staff: mongoStaff });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
@@ -36,7 +67,46 @@ exports.index = async (req, res) => {
   try {
     const start = req.query.start ? parseInt(req.query.start) : 1;
     const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+    const search = req.query.search || "ALL";
+    const skip = (start - 1) * limit;
 
+    // --- PRISMA (SUPABASE) ---
+    try {
+        const where = {
+            is_fake: req.query.type === "Fake"
+        };
+
+        if (search !== "ALL") {
+            where.OR = [
+                { username: { contains: search, mode: 'insensitive' } },
+                { gender: { contains: search, mode: 'insensitive' } },
+                { country: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        const [sUsers, totalCount] = await Promise.all([
+            prisma.user.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { created_at: 'desc' }
+            }),
+            prisma.user.count({ where })
+        ]);
+
+        if (sUsers && sUsers.length > 0) {
+            return res.status(200).json({
+                status: true,
+                message: "Success (Prisma)!!",
+                total: totalCount,
+                user: serialize(sUsers)
+            });
+        }
+    } catch (e) {
+        console.warn("Prisma Index Error:", e.message);
+    }
+
+    // --- MONGO FALLBACK ---
     let matchQuery = {};
     if (req.query.search != "ALL") {
       matchQuery = {
@@ -51,92 +121,35 @@ exports.index = async (req, res) => {
     let query;
 
     if (req.query.type === "Fake") {
-      query = {
-        isFake: true,
-      };
+      query = { isFake: true };
     } else {
-      query = {
-        isFake: false,
-      };
-    }
-
-    let dateFilterQuery = {};
-
-    if (req.query.startDate !== "ALL" && req.query.endDate !== "ALL") {
-      dateFilterQuery = {
-        analyticDate: { $gte: req.query.startDate, $lte: req.query.endDate },
-      };
+      query = { isFake: false };
     }
 
     const user = await User.aggregate([
-      {
-        $match: { ...matchQuery, ...query },
-      },
-      {
-        $addFields: {
-          analyticDate: {
-            $arrayElemAt: [{ $split: ["$analyticDate", ", "] }, 0],
-          },
-        },
-      },
-      {
-        $match: dateFilterQuery,
-      },
-      {
-        $lookup: {
-          from: 'levels',
-          localField: 'level',
-          foreignField: '_id',
-          as: 'level',
-        },
-      },
-      {
-        $unwind: {
-          path: '$level',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $sort: { createdAt: -1 },
-      },
+      { $match: { ...matchQuery, ...query } },
+      { $sort: { createdAt: -1 } },
       {
         $facet: {
-          user: [
-            { $skip: (start - 1) * limit }, // how many records you want to skip
-            { $limit: limit },
-          ],
-          gender: [
-            { $group: { _id: '$gender', gender: { $sum: 1 } } }, // get total records count
-          ],
-          activeUser: [
-            { $group: { _id: '$isOnline', activeUser: { $sum: 1 } } }, // get total records count
-          ],
-          pageInfo: [
-            { $group: { _id: null, totalRecord: { $sum: 1 } } }, // get total records count
-          ],
+          user: [{ $skip: skip }, { $limit: limit }],
+          gender: [{ $group: { _id: '$gender', gender: { $sum: 1 } } }],
+          activeUser: [{ $group: { _id: '$isOnline', activeUser: { $sum: 1 } } }],
+          pageInfo: [{ $group: { _id: null, totalRecord: { $sum: 1 } } }],
         },
       },
     ]);
 
-    if (!user)
-      return res
-        .status(200)
-        .json({ status: false, message: "Data not found!" });
-
     return res.status(200).json({
       status: true,
-      message: "Success!!",
+      message: "Success (Legacy)!!",
       total: user[0].pageInfo.length > 0 ? user[0].pageInfo[0].totalRecord : 0,
-      activeUser:
-        user[0].activeUser.length > 0 ? user[0].activeUser[0].activeUser : 0,
+      activeUser: user[0].activeUser.length > 0 ? user[0].activeUser[0].activeUser : 0,
       maleFemale: user[0].gender,
       user: user[0].user,
     });
   } catch (error) {
     console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message || "Server Error" });
   }
 };
 
@@ -193,6 +206,27 @@ exports.loginSignup = async (req, res) => {
         }
     }
 
+    // --- SUPABASE SYNC ---
+    const { data: sUser, error: sUserError } = await supabase
+        .from('users')
+        .select('*')
+        .or(`identity.eq.${identity},email.eq.${email}`)
+        .single();
+
+    if (sUser) {
+        if (sUser.is_block) return res.status(200).json({ status: false, message: "Account Blocked (Supabase)!" });
+
+        await supabase.from('users').update({
+            fcm_token: fcmToken || sUser.fcm_token,
+            last_login: new Date().toISOString(),
+            is_online: true
+        }).eq('id', sUser.id);
+
+        const token = jwt.sign({ _id: sUser.id, role: sUser.role }, config.JWT_SECRET);
+        return res.status(200).json({ status: true, message: "Success (Supabase)!!", user: sUser, token });
+    }
+
+    // Legacy MongoDB check
     let user = await User.findOne({
         $or: [{ identity: identity }, { email: email }]
     }).populate("level");
@@ -205,13 +239,46 @@ exports.loginSignup = async (req, res) => {
       user.isOnline = true;
       await user.save();
 
+      // MIGRATION: If user exists in Mongo but not Supabase, create in Supabase
+      const { data: migratedUser } = await supabase.from('users').insert({
+          identity: user.identity,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          image: user.image,
+          role: user.role,
+          diamond: user.diamond,
+          r_coin: user.rCoin,
+          unique_id: user.uniqueId,
+          is_online: true,
+          last_login: new Date().toISOString()
+      }).select().single();
+
       const token = jwt.sign({ _id: user._id, role: user.role }, config.JWT_SECRET);
-      return res.status(200).json({ status: true, message: "Success!!", user, token });
+      return res.status(200).json({ status: true, message: "Success (Migrated)!!", user, token });
     }
 
-    // Handle Signup
+    // Handle Signup (Brand New User)
+    const uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
+    const referralCode = "REF" + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    // 1. Create in Supabase
+    const { data: supabaseUser, error: supabaseError } = await supabase.from('users').insert({
+        unique_id: uniqueId,
+        identity,
+        email,
+        name,
+        username: username || "user_" + Math.floor(Math.random() * 10000),
+        image,
+        login_type: loginType,
+        referral_code: referralCode,
+        is_online: true,
+        last_login: new Date().toISOString()
+    }).select().single();
+
+    // 2. Create in MongoDB (Keep synced for now)
     const newUser = new User();
-    newUser.uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
+    newUser.uniqueId = uniqueId;
     newUser.lastLogin = new Date().toLocaleString();
     newUser.isOnline = true;
     newUser.loginType = loginType;
@@ -220,35 +287,14 @@ exports.loginSignup = async (req, res) => {
     newUser.name = name;
     newUser.username = username || "user_" + Math.floor(Math.random() * 10000);
     newUser.image = image;
-    newUser.profileSetupCompleted = false;
-
-    if (password) {
-        newUser.password = bcrypt.hashSync(password, 10);
-    }
-
-    // Generate referral code
-    const randomChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let referralCode = "";
-    for (let i = 0; i < 8; i++) referralCode += randomChars.charAt(Math.floor(Math.random() * randomChars.length));
     newUser.referralCode = referralCode;
 
-    const setting = await Setting.findOne({});
-    newUser.diamond += setting ? setting.loginBonus : 0;
+    if (password) newUser.password = bcrypt.hashSync(password, 10);
 
     await newUser.save();
 
-    // Wallet Entry
-    const income = new Wallet();
-    income.userId = newUser._id;
-    income.rCoin = setting ? setting.loginBonus : 0;
-    income.type = 5;
-    income.date = new Date().toLocaleString();
-    await income.save();
-
-    const finalUser = await updateLevel(newUser._id);
-    const token = jwt.sign({ _id: finalUser._id, role: finalUser.role }, config.JWT_SECRET);
-
-    return res.status(200).json({ status: true, message: "Registration Success!!", user: finalUser, token });
+    const token = jwt.sign({ _id: newUser._id, role: newUser.role }, config.JWT_SECRET);
+    return res.status(200).json({ status: true, message: "Registration Success!!", user: newUser, token });
 
   } catch (error) {
     console.log(error);

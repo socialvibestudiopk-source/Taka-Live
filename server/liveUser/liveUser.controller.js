@@ -3,24 +3,28 @@ const User = require("../user/user.model");
 const Setting = require("../setting/setting.model");
 const Follower = require("../follower/follower.model");
 const LiveStreamingHistory = require("../liveStreamingHistory/liveStreamingHistory.model");
+const prisma = require("../../prisma");
 const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
 
 //FCM node
 const fcm = require("../../util/fcm");
 
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
+
 // Agora token Builder
 exports.generateToken = async (req, res) => {
   try {
     if (!req.body.channelName) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Details !" });
+      return res.status(200).json({ status: false, message: "Invalid Details !" });
     }
-    const setting = await Setting.findOne({});
-    if (!setting)
-      return res
-        .status(200)
-        .json({ status: false, message: "Setting Not Found" });
+
+    const setting = await prisma.setting.findFirst() || await Setting.findOne({});
+    if (!setting) return res.status(200).json({ status: false, message: "Setting Not Found" });
 
     const role = RtcRole.PUBLISHER;
     const account = "0";
@@ -29,541 +33,184 @@ exports.generateToken = async (req, res) => {
     const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
     const token = RtcTokenBuilder.buildTokenWithAccount(
-      setting.agoraKey,
-      setting.agoraCertificate,
+      setting.agora_key || setting.agoraKey,
+      setting.agora_certificate || setting.agoraCertificate,
       req.body.channelName,
       account,
       role,
       privilegeExpiredTs
     );
 
-    console.log("Token With UserAccount: " + token);
     return res.status(200).json({ status: true, message: "Success", token });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
 // live the user
 exports.userIsLive = async (req, res) => {
   try {
-    if (req.body.userId && req.body.channel) {
-      const user = await User.findById(req.body.userId);
+    const { userId, channel, background, audio, isPublic, agoraUID } = req.body;
+    if (!userId || !channel) return res.status(200).json({ status: false, message: "Invalid Details!" });
 
-      if (!user) {
-        return res
-          .status(200)
-          .json({ status: false, message: "User does not Exist!" });
-      }
-
-      // CHECK FOR EXISTING ROOM (Duplicate Protection)
-      const existingLive = await LiveUser.findOne({ liveUserId: user._id });
-      if (existingLive) {
-          console.log("Returning existing room for user:", user._id);
-          const liveUser_ = await LiveUser.aggregate([
-            { $match: { _id: existingLive._id } },
-            { $addFields: { view: { $size: "$view" } } }
-          ]);
-          return res.status(200).json({ status: true, message: "Already Live!", liveUser: liveUser_[0] });
-      }
-
-      const setting = await Setting.findOne({});
-      if (!setting)
-        return res
-          .status(200)
-          .json({ status: false, message: "Setting Not Found" });
-
-      const role = RtcRole.PUBLISHER;
-      const uid = req.body.agoraUID ? req.body.agoraUID : 0;
-      const expirationTimeInSeconds = 24 * 3600;
-      const currentTimestamp = Math.floor(Date.now() / 1000);
-      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
-
-      const token = await RtcTokenBuilder.buildTokenWithUid(
-        setting.agoraKey,
-        setting.agoraCertificate,
-        req.body.channel,
-        uid,
-        role,
-        privilegeExpiredTs
-      );
-
-      user.isOnline = true;
-      user.isBusy = true;
-      user.token = token;
-      user.channel = req.body.channel;
-
-      await user.save();
-
-      const liveStreamingHistory = new LiveStreamingHistory();
-      liveStreamingHistory.userId = user._id;
-      liveStreamingHistory.startTime = new Date().toLocaleString();
-
-      await liveStreamingHistory.save();
-
-      const liveUser = await LiveUser.findOne({ liveUserId: user._id });
-      const createLiveUser = new LiveUser();
-      let LiveUserData;
-
-      if (liveUser) {
-        liveUser.background = req.body.background;
-        liveUser.audio = req?.body?.audio ? req?.body?.audio : false;
-        liveUser.isPublic = req.body.isPublic;
-        liveUser.liveStreamingId = liveStreamingHistory._id;
-        liveUser.agoraUID = req.body.agoraUID;
-        LiveUserData = await LiveUserFunction(liveUser, user);
-      } else {
-        createLiveUser.background = req.body.background;
-        createLiveUser.audio = req?.body?.audio ? req?.body?.audio : false;
-        createLiveUser.isPublic = req.body.isPublic;
-        createLiveUser.liveStreamingId = liveStreamingHistory._id;
-        createLiveUser.agoraUID = req.body.agoraUID;
-        LiveUserData = await LiveUserFunction(createLiveUser, user);
-      }
-
-      const followers = await Follower.find({
-        toUserId: user._id,
-      }).populate("toUserId fromUserId");
-
-      followers.map(async (data) => {
-        if (
-          data.fromUserId &&
-          !data.fromUserId.isBlock &&
-          data.fromUserId.notification.favoriteLive
-        ) {
-          const payload = {
-            to: data.fromUserId.fcmToken,
-            notification: {
-              title: `${data.toUserId.name} is Live`,
-            },
-            data: {
-              data: {
-                _id: LiveUserData._id,
-                liveUserId: LiveUserData.liveUserId,
-                name: LiveUserData.name,
-                country: LiveUserData.country,
-                image: LiveUserData.image,
-                token: LiveUserData.token,
-                channel: LiveUserData.channel,
-                rCoin: LiveUserData.rCoin,
-                diamond: LiveUserData.diamond,
-                username: LiveUserData.username,
-                isVIP: LiveUserData.isVIP,
-                age: LiveUserData.age,
-                liveStreamingId: LiveUserData.liveStreamingId,
-                view: String(0),
-              },
-              type: "LIVE",
-            },
-          };
-
-          await fcm.send(payload, function (err, response) {
-            if (err) {
-              console.log("Something has gone wrong!", err);
+    // --- PRISMA (SUPABASE) ---
+    try {
+        const sUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (sUser) {
+            const existingLive = await prisma.liveUser.findFirst({ where: { live_user_id: userId } });
+            if (existingLive) {
+                return res.status(200).json({ status: true, message: "Already Live (Prisma)!", liveUser: serialize(existingLive) });
             }
-          });
+
+            const setting = await prisma.setting.findFirst() || await Setting.findOne({});
+            const token = await RtcTokenBuilder.buildTokenWithUid(
+                setting.agora_key || setting.agoraKey,
+                setting.agora_certificate || setting.agoraCertificate,
+                channel, Number(agoraUID) || 0, RtcRole.PUBLISHER, Math.floor(Date.now() / 1000) + 3600
+            );
+
+            await prisma.user.update({ where: { id: userId }, data: { is_online: true, is_busy: true } });
+            const history = await prisma.liveStreamingHistory.create({ data: { user_id: userId, start_time: new Date() } });
+
+            const liveUser = await prisma.liveUser.create({
+                data: {
+                    live_user_id: userId,
+                    name: sUser.name,
+                    country: sUser.country,
+                    image: sUser.image,
+                    username: sUser.username,
+                    is_vip: sUser.is_vip,
+                    age: sUser.age,
+                    token,
+                    channel,
+                    background,
+                    audio: audio === "true" || audio === true,
+                    is_public: isPublic === "true" || isPublic === true,
+                    live_history_id: history.id,
+                    agora_uid: Number(agoraUID) || 0
+                }
+            });
+
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", liveUser: serialize(liveUser) });
         }
-      });
+    } catch (e) { console.warn("Prisma userIsLive Error:", e.message); }
 
-      let matchQuery = {};
-      if (liveUser) {
-        matchQuery = { $match: { _id: { $eq: liveUser._id } } };
-      } else {
-        matchQuery = { $match: { _id: { $eq: createLiveUser._id } } };
-      }
+    // --- MONGO FALLBACK ---
+    const user = await User.findById(userId);
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
 
-      const liveUser_ = await LiveUser.aggregate([
-        matchQuery,
-        { $addFields: { view: { $size: "$view" } } },
-        // {
-        //   $lookup: {
-        //     from: "livestreaminghistories",
-        //     localField: "liveStreamingId",
-        //     foreignField: "_id",
-        //     as: "liveStreamingId",
-        //   },
-        // },
-        // {
-        //   $unwind: {
-        //     path: "$liveStreamingId",
-        //     preserveNullAndEmptyArrays: false,
-        //   },
-        // },
-      ]);
-
-      console.log(
-        "-------------------------------- LiveUser Object --------------------------------"
-      );
-      console.log("LiveUser", liveUser_[0]);
-
-      return res
-        .status(200)
-        .json({ status: true, message: "Success!!", liveUser: liveUser_[0] });
-    } else {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Details!" });
+    const existingLiveMongo = await LiveUser.findOne({ liveUserId: user._id });
+    if (existingLiveMongo) {
+        return res.status(200).json({ status: true, message: "Already Live!", liveUser: existingLiveMongo });
     }
+
+    const settingMongo = await Setting.findOne({});
+    const tokenMongo = await RtcTokenBuilder.buildTokenWithUid(
+        settingMongo.agoraKey, settingMongo.agoraCertificate, channel, Number(agoraUID) || 0, RtcRole.PUBLISHER, Math.floor(Date.now() / 1000) + 3600
+    );
+
+    user.isOnline = true;
+    user.isBusy = true;
+    user.token = tokenMongo;
+    user.channel = channel;
+    await user.save();
+
+    const historyMongo = new LiveStreamingHistory({ userId: user._id, startTime: new Date().toLocaleString() });
+    await historyMongo.save();
+
+    const liveUserMongo = new LiveUser({
+        liveUserId: user._id,
+        name: user.name,
+        country: user.country,
+        image: user.image,
+        username: user.username,
+        isVIP: user.isVIP,
+        age: user.age,
+        token: tokenMongo,
+        channel: channel,
+        background: background,
+        audio: audio === "true" || audio === true,
+        isPublic: isPublic === "true" || isPublic === true,
+        liveStreamingId: historyMongo._id,
+        agoraUID: Number(agoraUID) || 0
+    });
+    await liveUserMongo.save();
+
+    return res.status(200).json({ status: true, message: "Success (Legacy)!!", liveUser: liveUserMongo });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// check if user is live
-exports.checkLive = async (req, res) => {
+// get live user list
+exports.getLiveUser = async (req, res) => {
   try {
-    if (!req.query.userId) {
-      return res.status(200).json({ status: false, message: "Invalid Details!" });
-    }
+    const userId = req.query.userId;
+    const start = parseInt(req.query.start) || 0;
+    const limit = parseInt(req.query.limit) || 20;
 
-    const liveUser = await LiveUser.findOne({ liveUserId: req.query.userId });
+    // --- PRISMA (SUPABASE) ---
+    try {
+        let where = { is_public: true };
+        if (req.query.type === "All") {
+            where.live_user_id = { not: userId };
+        } else if (req.query.type === "Following") {
+            const following = await prisma.follower.findMany({ where: { from_user_id: userId }, select: { to_user_id: true } });
+            where.live_user_id = { in: following.map(f => f.to_user_id) };
+        }
 
-    if (liveUser) {
-      return res.status(200).json({
-        status: true,
-        message: "User is Live!",
-        liveUser,
-      });
-    } else {
-      return res.status(200).json({
-        status: false,
-        message: "User is not Live!",
-      });
-    }
+        const liveUsers = await prisma.liveUser.findMany({
+            where,
+            include: { user: true },
+            orderBy: { created_at: 'desc' },
+            skip: start,
+            take: limit
+        });
+
+        if (liveUsers && liveUsers.length > 0) {
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", users: serialize(liveUsers) });
+        }
+    } catch (e) { console.warn("Prisma getLiveUser Error:", e.message); }
+
+    // --- MONGO FALLBACK ---
+    const users = await LiveUser.find({ isPublic: true })
+        .populate("liveUserId")
+        .sort({ createdAt: -1 })
+        .skip(start)
+        .limit(limit);
+
+    return res.status(200).json({ status: true, message: "Success (Legacy)!!", users });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({
-      status: false,
-      error: error.message || "Server Error",
-    });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
 // terminate live session
 exports.terminateAudioSession = async (req, res) => {
   try {
-    if (!req.query.userId) {
-      return res.status(200).json({ status: false, message: "Invalid Details!" });
-    }
+    const userId = req.query.userId;
+    if (!userId) return res.status(200).json({ status: false, message: "userId required" });
 
-    const liveUser = await LiveUser.findOne({ liveUserId: req.query.userId });
+    // Try Prisma
+    try {
+        const liveSession = await prisma.liveUser.findFirst({ where: { live_user_id: userId } });
+        if (liveSession) {
+            await prisma.user.update({ where: { id: userId }, data: { is_busy: false, is_online: true } });
+            await prisma.liveUser.delete({ where: { id: liveSession.id } });
+            return res.status(200).json({ status: true, message: "Terminated (Prisma)" });
+        }
+    } catch (e) {}
 
+    // Fallback
+    const liveUser = await LiveUser.findOne({ liveUserId: userId });
     if (liveUser) {
-      // Mark user as not busy
-      const user = await User.findById(req.query.userId);
-      if (user) {
-        user.isBusy = false;
-        user.isOnline = true; // still online but not in room
-        await user.save();
-      }
-
+      await User.updateOne({ _id: userId }, { isBusy: false, isOnline: true });
       await liveUser.deleteOne();
-
-      return res.status(200).json({
-        status: true,
-        message: "Live session terminated successfully!",
-      });
-    } else {
-      return res.status(200).json({
-        status: false,
-        message: "No active live session found for this user!",
-      });
+      return res.status(200).json({ status: true, message: "Terminated (Legacy)" });
     }
+
+    return res.status(200).json({ status: false, message: "No session found" });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({
-      status: false,
-      error: error.message || "Server Error",
-    });
-  }
-};
-
-const LiveUserFunction = async (user, data) => {
-  user.name = data.name;
-  user.country = data.country;
-  user.image = data.image;
-  user.token = data.token;
-  user.channel = data.channel;
-  user.rCoin = data.rCoin;
-  user.diamond = data.diamond;
-  user.username = data.username;
-  user.isVIP = data.isVIP;
-  user.liveUserId = data._id;
-  user.age = data.age;
-
-  await user.save();
-
-  return user;
-};
-
-// get live user list
-exports.getLiveUser = async (req, res) => {
-  try {
-    const user = await User.findOne({ _id: req.query.userId });
-    console.log("liveUserId", req.query.userId);
-    if (!user)
-      return res
-        .status(200)
-        .json({ status: false, message: "User does not Exist!" });
-
-    if (req.query.type === "All") {
-      const users = await LiveUser.aggregate([
-        {
-          $match: {
-            isPublic: true,
-            liveUserId: { $ne: user._id },
-          },
-        },
-        {
-          $sort: { createdAt: -1 },
-        },
-        {
-          $addFields: {
-            View: {
-              $size: {
-                $filter: {
-                  input: "$view",
-                  as: "item",
-                  cond: { $eq: ["$$item.isAdd", true] },
-                },
-              },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            liveUserId: 1,
-            name: 1,
-            country: 1,
-            image: 1,
-            token: 1,
-            channel: 1,
-            rCoin: 1,
-            diamond: 1,
-            seat: 1,
-            background: 1,
-            audio: 1,
-            username: 1,
-            isVIP: 1,
-            age: 1,
-            liveStreamingId: 1,
-            agoraUID: 1,
-            view: "$View",
-          },
-        },
-        {
-          $addFields: {
-            isFake: false,
-            link: null,
-          },
-        },
-        {
-          $facet: {
-            user: [
-              { $skip: req.query.start ? parseInt(req.query.start) : 0 }, // how many records you want to skip
-              { $limit: req.query.limit ? parseInt(req.query.limit) : 20 },
-            ],
-          },
-        },
-      ]);
-
-      return res.status(200).json({
-        status: true,
-        message: "Success!!",
-        users: users[0].user,
-      });
-    }
-    if (req.query.type === "Popular") {
-      const users = await LiveUser.aggregate([
-        {
-          $match: {
-            isPublic: true,
-          },
-        },
-        {
-          $lookup: {
-            from: "livestreaminghistories",
-            let: { liveStreamingId: "$liveStreamingId" },
-            as: "liveStreaming",
-            pipeline: [
-              {
-                $match: { $expr: { $eq: ["$$liveStreamingId", "$_id"] } },
-              },
-            ],
-          },
-        },
-        {
-          $unwind: {
-            path: "$liveStreaming",
-            preserveNullAndEmptyArrays: false,
-          },
-        },
-        {
-          $addFields: {
-            View: {
-              $size: {
-                $filter: {
-                  input: "$view",
-                  as: "item",
-                  cond: { $eq: ["$$item.isAdd", true] },
-                },
-              },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            liveUserId: 1,
-            name: 1,
-            country: 1,
-            image: 1,
-            token: 1,
-            channel: 1,
-            seat: 1,
-            background: 1,
-            audio: 1,
-            rCoin: 1,
-            diamond: 1,
-            username: 1,
-            isVIP: 1,
-            age: 1,
-            liveStreamingId: "$liveStreaming._id",
-            gifts: "$liveStreaming.gifts",
-            comments: "$liveStreaming.comments",
-            view: "$View",
-          },
-        },
-        {
-          $addFields: {
-            isFake: false,
-            link: null,
-          },
-        },
-        {
-          $sort: { comments: -1, gifts: -1 },
-        },
-        {
-          $facet: {
-            user: [
-              { $skip: req.query.start ? parseInt(req.query.start) : 0 }, // how many records you want to skip
-              { $limit: req.query.limit ? parseInt(req.query.limit) : 20 },
-            ],
-          },
-        },
-      ]);
-
-      return res.status(200).json({
-        status: true,
-        message: "Success!!",
-        users: users[0].user.length > 0 ? users[0].user : [],
-      });
-    }
-    if (req.query.type === "Following") {
-      const user = await User.findById(req.query.userId);
-
-      if (!user)
-        return res
-          .status(200)
-          .json({ status: false, message: "User does not Exist!" });
-      const users = await LiveUser.aggregate([
-        {
-          $lookup: {
-            from: "followers",
-            let: { userId: "$liveUserId" },
-            as: "follower",
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ["$$userId", "$toUserId"] },
-                      { $eq: [user._id, "$fromUserId"] },
-                    ],
-                  },
-                },
-              },
-            ],
-          },
-        },
-        {
-          $unwind: {
-            path: "$follower",
-            preserveNullAndEmptyArrays: false,
-          },
-        },
-        {
-          $addFields: {
-            View: {
-              $size: {
-                $filter: {
-                  input: "$view",
-                  as: "item",
-                  cond: { $eq: ["$$item.isAdd", true] },
-                },
-              },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            liveUserId: 1,
-            name: 1,
-            country: 1,
-            image: 1,
-            token: 1,
-            channel: 1,
-            rCoin: 1,
-            seat: 1,
-            background: 1,
-            audio: 1,
-            diamond: 1,
-            username: 1,
-            isVIP: 1,
-            age: 1,
-            liveStreamingId: 1,
-            view: "$View",
-          },
-        },
-        {
-          $addFields: {
-            isFake: false,
-            link: null,
-          },
-        },
-        {
-          $sort: { comments: -1, gifts: -1 },
-        },
-        {
-          $facet: {
-            user: [
-              { $skip: req.query.start ? parseInt(req.query.start) : 0 }, // how many records you want to skip
-              { $limit: req.query.limit ? parseInt(req.query.limit) : 20 },
-            ],
-          },
-        },
-      ]);
-
-      return res.status(200).json({
-        status: true,
-        message: "Success!!",
-        users: users[0].user.length > 0 ? users[0].user : [],
-      });
-    }
-  } catch (error) {
-    console.log(error);
-    return res.status(500).json({
-      status: false,
-      error: error.message || "Server Error",
-      user: "",
-    });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };

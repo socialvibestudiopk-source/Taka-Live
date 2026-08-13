@@ -14,6 +14,7 @@ const adminSchema = new Schema(
       enum: ["OWNER", "MANAGER", "SUPER_ADMIN", "ADMIN", "BD_LEADER", "BD", "AGENCY", "HOST", "COIN_SELLER"],
       default: "ADMIN"
     },
+    supabaseId: { type: String, default: null },
     flag: { type: Boolean, default: false },
   },
   {

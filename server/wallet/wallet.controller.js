@@ -1,5 +1,7 @@
 const Wallet = require("./wallet.model");
 const User = require("../user/user.model");
+const supabase = require("../../supabase");
+const prisma = require("../../prisma"); // Add Prisma Client
 const Setting = require("../setting/setting.model");
 const LiveStreamingHistory = require("../liveStreamingHistory/liveStreamingHistory.model");
 const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
@@ -835,10 +837,63 @@ exports.sendGiftFakeHost = async (req, res) => {
   }
 };
 
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
+
 // Owner/Admin manual wallet adjustment (Improved with reason and adminId)
 exports.adjustWallet = async (req, res) => {
     try {
         const { userId, diamondDelta = 0, rCoinDelta = 0, reason } = req.body;
+
+        // --- PRISMA (SUPABASE) TRANSACTION ---
+        try {
+            const result = await prisma.$transaction(async (tx) => {
+                const sUser = await tx.user.findUnique({
+                    where: { id: userId },
+                    select: { id: true, diamond: true, r_coin: true }
+                });
+
+                if (sUser) {
+                    const newDiamond = Number(sUser.diamond) + Number(diamondDelta);
+                    const newRcoin = Number(sUser.r_coin) + Number(rCoinDelta);
+
+                    const updatedUser = await tx.user.update({
+                        where: { id: userId },
+                        data: {
+                            diamond: newDiamond,
+                            r_coin: newRcoin
+                        }
+                    });
+
+                    await tx.wallet.create({
+                        data: {
+                            user_id: userId,
+                            type: 8,
+                            diamond: Math.abs(Number(diamondDelta)),
+                            r_coin: Math.abs(Number(rCoinDelta)),
+                            is_income: Number(diamondDelta) > 0 || Number(rCoinDelta) > 0,
+                            reason: reason || "Admin adjustment",
+                            admin_id: req.admin?.id || req.admin?._id?.toString()
+                        }
+                    });
+
+                    return updatedUser;
+                }
+                return null;
+            });
+
+            if (result) {
+                return res.status(200).json({ status: true, message: "Wallet adjusted (Prisma)", user: serialize(result) });
+            }
+        } catch (e) {
+            console.warn("Prisma Adjustment Error:", e.message);
+        }
+
+        // 2. Legacy Mongo Fallback
         const user = await User.findById(userId);
         if (!user) return res.status(200).json({ status: false, message: "User not found" });
 
@@ -864,7 +919,7 @@ exports.adjustWallet = async (req, res) => {
         await user.save();
         await wallet.save();
 
-        return res.status(200).json({ status: true, message: "Wallet adjusted successfully", user });
+        return res.status(200).json({ status: true, message: "Wallet adjusted successfully (Legacy)", user });
     } catch (error) {
         return res.status(500).json({ status: false, error: error.message });
     }

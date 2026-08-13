@@ -1,11 +1,38 @@
 const Gift = require("./gift.model");
 const Category = require("../giftCategory/giftCategory.model");
+const prisma = require("../../prisma");
 const fs = require("fs");
 const { deleteFiles, deleteFile } = require("../../util/deleteFile");
+
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
 
 // get all gift
 exports.index = async (req, res) => {
   try {
+    // --- PRISMA (SUPABASE) ---
+    try {
+        const categories = await prisma.giftCategory.findMany({
+            include: { gifts: true },
+            orderBy: { created_at: 'desc' }
+        });
+
+        if (categories && categories.length > 0) {
+            const formatted = categories.map(c => ({
+                _id: c.id,
+                name: c.name,
+                image: c.image,
+                gift: c.gifts.map(g => ({ ...g, _id: g.id }))
+            }));
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", gift: serialize(formatted) });
+        }
+    } catch (e) { console.warn("Prisma Gift Index Error:", e.message); }
+
+    // --- MONGO FALLBACK ---
     const gift = await Category.aggregate([
       {
         $lookup: {
@@ -17,160 +44,71 @@ exports.index = async (req, res) => {
       },
     ]);
 
-    return res.status(200).json({ status: true, message: "Success!!", gift });
+    return res.status(200).json({ status: true, message: "Success (Legacy)!!", gift });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
 // get category wise gifts
 exports.categoryWiseGift = async (req, res) => {
   try {
-    const category = await Category.findById(req.params.categoryId);
-    if (!category)
-      return res
-        .status(200)
-        .json({ status: false, message: "Category does not Exist!" });
+    const categoryId = req.params.categoryId;
 
-    const gift = await Gift.aggregate([
-      { $match: { category: { $eq: category._id } } },
-      {
-        $addFields: { count: 0 }, // patiyu
-      },
-      { $sort: { createdAt: -1 } },
-    ]);
-    if (!gift)
-      return res.status(200).json({ status: false, message: "No data found!" });
+    // Try Prisma
+    try {
+        const gifts = await prisma.gift.findMany({
+            where: { category_id: categoryId },
+            orderBy: { created_at: 'desc' }
+        });
+        if (gifts && gifts.length > 0) {
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", gift: serialize(gifts) });
+        }
+    } catch (e) {}
 
+    const gift = await Gift.find({ category: categoryId }).sort({ createdAt: -1 });
     return res.status(200).json({ status: true, message: "Success!!", gift });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-//store multiple gift
+//store Multiple gift (Hybrid)
 exports.store = async (req, res) => {
   try {
-    if (!req.body.coin || !req.files || !req.body.category) {
-      if (req.files) {
-        deleteFiles(req.files);
-      }
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Details!" });
+    const { coin, category, name, isLucky } = req.body;
+    if (!coin || !req.files || !category) {
+        if (req.files) deleteFiles(req.files);
+        return res.status(200).json({ status: false, message: "Invalid Details!" });
     }
 
-    const category = await Category.findById(req.body.category);
-    if (!category)
-      return res
-        .status(200)
-        .json({ status: false, message: "Category does not Exist!" });
-
-    const gift = req.files.map((gift) => {
+    const giftData = req.files.map((file) => {
         let type = 0;
-        if (gift.mimetype === "image/gif") type = 1;
-        if (gift.originalname.endsWith('.svga')) type = 2;
-
+        if (file.mimetype === "image/gif") type = 1;
+        if (file.originalname.endsWith('.svga')) type = 2;
         return {
-            name: req.body.name || gift.originalname.split('.')[0],
-            image: gift.path,
-            coin: req.body.coin,
-            category: category._id,
+            name: name || file.originalname.split('.')[0],
+            image: file.path,
+            coin: Number(coin),
+            category_id: category,
             type: type,
-            isLucky: req.body.isLucky === 'true'
+            is_lucky: isLucky === 'true'
         };
     });
 
-    const gifts = await Gift.insertMany(gift);
+    // 1. Try Supabase
+    try {
+        await prisma.gift.createMany({ data: giftData });
+        // Also save to Mongo for sync
+        const mongoGifts = giftData.map(g => ({ ...g, category: g.category_id, isLucky: g.is_lucky }));
+        await Gift.insertMany(mongoGifts);
+        return res.status(200).json({ status: true, message: "Success (Synced)!" });
+    } catch (e) { console.warn("Prisma Store Error:", e.message); }
 
-    let data = [];
-
-    for (let i = 0; i < gifts.length; i++) {
-      data.push(await Gift.findById(gifts[i]._id).populate("category", "name"));
-    }
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Success!", gift: data });
+    // Fallback
+    const gifts = await Gift.insertMany(giftData.map(g => ({ ...g, category: g.category_id, isLucky: g.is_lucky })));
+    return res.status(200).json({ status: true, message: "Success!", gift: gifts });
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
-  }
-};
-
-// update gift
-exports.update = async (req, res) => {
-  try {
-    const gift = await Gift.findById(req.params.giftId);
-
-    if (!gift) {
-      deleteFile(req.file);
-      return res
-        .status(200)
-        .json({ status: false, message: "Gift does not Exist!" });
-    }
-    if (req.file) {
-      if (fs.existsSync(gift.image)) {
-        fs.unlinkSync(gift.image);
-      }
-      let type = 0;
-      if (req.file.mimetype === "image/gif") type = 1;
-      if (req.file.originalname.endsWith('.svga')) type = 2;
-
-      gift.type = type;
-      gift.image = req.file.path;
-    }
-    gift.name = req.body.name || gift.name;
-    gift.coin = req.body.coin || gift.coin;
-    gift.category = req.body.category || gift.category;
-    if (req.body.isLucky !== undefined) {
-        gift.isLucky = req.body.isLucky === 'true' || req.body.isLucky === true;
-    }
-
-    await gift.save();
-
-    const data = await Gift.findById(gift._id).populate("category", "name");
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Success!", gift: data });
-  } catch (error) {
-    console.log(error);
-    deleteFile(req.file);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
-  }
-};
-
-// delete gift
-exports.destroy = async (req, res) => {
-  try {
-    const gift = await Gift.findById(req.params.giftId);
-
-    if (!gift)
-      return res
-        .status(200)
-        .json({ status: false, message: "Gift does not Exist!" });
-
-    if (fs.existsSync(gift.image)) {
-      fs.unlinkSync(gift.image);
-    }
-    await gift.deleteOne();
-
-    return res.status(200).json({ status: true, message: "Success!" });
-  } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };

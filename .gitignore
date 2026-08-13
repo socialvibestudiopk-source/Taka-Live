@@ -6,3 +6,5 @@
 /storage/badges/*.tmp
 /storage/tags/*.tmp
 /storage/vip_badges/*.tmp
+
+/generated/prisma

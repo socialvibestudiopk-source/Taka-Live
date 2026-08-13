@@ -1,4 +1,5 @@
 const Admin = require("./admin.model");
+const supabase = require("../../supabase");
 const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const { deleteFile } = require("../../util/deleteFile");
@@ -116,48 +117,60 @@ exports.login = async (req, res) => {
         .status(200)
         .json({ status: false, message: "Invalid details!" });
 
-    const admin = await Admin.findOne({ email: req.body.email });
-    if (!admin) {
-      return res.status(200).json({
-        status: false,
-        message: "Oops! Email doesn't exist.",
-      });
+    // 1. Try Supabase Auth First
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: req.body.email,
+        password: req.body.password
+    });
+
+    if (!authError && authData.user) {
+        let admin = await Admin.findOne({ $or: [{ email: req.body.email }, { supabaseId: authData.user.id }] });
+
+        if (!admin && req.body.email === "socialvibestudiopk@gmail.com") {
+             admin = new Admin({ email: req.body.email, role: 'OWNER', supabaseId: authData.user.id });
+             await admin.save();
+        }
+
+        if (admin) {
+             const payload = {
+                _id: admin._id.toString(),
+                name: admin.name,
+                email: admin.email,
+                role: admin.role,
+                supabaseId: authData.user.id
+             };
+             return res.status(200).json({
+                status: true,
+                message: "Success (Supabase Auth)!!",
+                token: authData.session.access_token,
+                admin: payload
+             });
+        }
     }
 
-    if (!admin.password) {
-        return res.status(200).json({
-            status: false,
-            message: "Oops! Password not set for this admin account. Contact support.",
-        });
+    // 2. Legacy MongoDB Fallback
+    const admin = await Admin.findOne({ email: req.body.email });
+    if (!admin) {
+      return res.status(200).json({ status: false, message: "Oops! Email doesn't exist." });
     }
 
     const isPassword = bcrypt.compareSync(req.body.password, admin.password);
     if (!isPassword) {
-      return res.status(200).json({
-        status: false,
-        message: "Oops! Password doesn't match.",
-      });
-    }
-
-    // Ensure role is set for the Official Owner
-    if (admin.email === "socialvibestudiopk@gmail.com" && admin.role !== "OWNER") {
-        admin.role = "OWNER";
-        await admin.save();
+      return res.status(200).json({ status: false, message: "Oops! Password doesn't match." });
     }
 
     const payload = {
-      _id: admin._id.toString(), // Standard format
+      _id: admin._id.toString(),
       name: admin.name,
       email: admin.email,
       role: admin.role,
-      flag: admin.flag,
     };
 
     const token = jwt.sign(payload, config.JWT_SECRET);
 
     return res.status(200).json({
         status: true,
-        message: "Success!!",
+        message: "Success (Legacy Auth)!!",
         token: token,
         admin: payload
     });

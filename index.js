@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const supabase = require("./supabase"); // Supabase Client
 const app = express();
 const path = require("path");
 const cors = require("cors");
@@ -16,7 +17,13 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Static files check - Render Fix
 app.use("/storage", express.static(path.join(__dirname, "storage")));
+
+// Redirect root to health check if index.html is missing
+app.get("/", (req, res) => {
+  res.redirect("/health");
+});
 
 // model
 const Wallet = require("./server/wallet/wallet.model");
@@ -120,10 +127,31 @@ app.use("/", require("./server/chat/chat.route"));
 app.use("/", require("./server/login/login.route"));
 app.use("/", require("./server/notification/notification.route"));
 
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
+  let supabaseStatus = "DISCONNECTED";
+  let prismaStatus = "DISCONNECTED";
+
+  try {
+      const { error } = await supabase.from('users').select('id').limit(1);
+      if (!error) supabaseStatus = "CONNECTED";
+  } catch (e) {
+      supabaseStatus = "ERROR";
+  }
+
+  try {
+      const prisma = require("./server/prisma");
+      await prisma.$connect();
+      prismaStatus = "CONNECTED";
+  } catch (e) {
+      prismaStatus = "ERROR";
+  }
+
   res.status(200).json({
     status: "OK",
-    db: mongoose.connection.readyState === 1 ? "CONNECTED" : "DISCONNECTED",
+    mongodb: mongoose.connection.readyState === 1 ? "CONNECTED" : "DISCONNECTED",
+    supabase: supabaseStatus,
+    prisma: prismaStatus,
+    uptime: process.uptime(),
     time: new Date().toISOString()
   });
 });
@@ -210,13 +238,14 @@ try {
   console.warn('Owner panel static serve not configured or path missing:', ownerPanelPath);
 }
 
-// Fallback to public index.html for other routes
-app.get('/*', function (req, res) {
-  res.status(200).sendFile(path.join(__dirname, 'public', 'index.html'));
+// Fallback removed - Render Fix
+app.get('/health-check', function (req, res) {
+  res.status(200).json({ status: "OK" });
 });
 
 //mongodb connection
-mongoose.connect(process.env.MONGODB_URI, {
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://placeholder";
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(async () => {
