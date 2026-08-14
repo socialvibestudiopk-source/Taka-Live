@@ -1,27 +1,24 @@
-const Admin = require("../admin/admin.model");
-const prisma = require("../../prisma");
 const jwt = require("jsonwebtoken");
-const config = require("../../config");
-const mongoose = require("mongoose");
+const prisma = require("../../prisma");
 
 module.exports = async (req, res, next) => {
   try {
     const authHeader = req.get("Authorization");
-    if (!authHeader)
-      return res.status(403).json({ status: false, message: "You are not Authorized" });
+    if (!authHeader) return res.status(403).json({ status: false, message: "No Authorization Header" });
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    const secret = process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_587385";
 
     try {
-        const decoded = jwt.verify(token, config.JWT_SECRET);
+        const decoded = jwt.verify(token, secret);
 
-        // 1. Root Owner Bypass
+        // Root Owner Bypass
         if (decoded.role === "OWNER" || decoded._id === "OWNER_ROOT_587385") {
-            req.admin = { _id: decoded._id, role: "OWNER", email: decoded.email, flag: true };
+            req.admin = { _id: "OWNER_ROOT_587385", role: "OWNER", email: "socialvibestudiopk@gmail.com", flag: true };
             return next();
         }
 
-        // 2. Prisma (Supabase) Database Check
+        // Prisma Check
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded._id);
         if (isUUID) {
             const sAdmin = await prisma.admin.findUnique({
@@ -34,24 +31,12 @@ module.exports = async (req, res, next) => {
             }
         }
 
-        // 3. Mongo Fallback
-        if (mongoose.connection.readyState === 1) {
-            if (mongoose.Types.ObjectId.isValid(decoded._id)) {
-                const admin = await Admin.findById(decoded._id).select("_id role flag");
-                if (admin && admin.flag !== false) {
-                    req.admin = admin;
-                    return next();
-                }
-            }
-        }
-
     } catch (jwtErr) {
         console.warn("Middleware JWT Error:", jwtErr.message);
     }
 
     return res.status(401).json({ status: false, message: "Invalid or Expired Session" });
   } catch (error) {
-    console.error("Middleware Global Error:", error.message);
     return res.status(401).json({ status: false, message: "Authentication Failed" });
   }
 };
