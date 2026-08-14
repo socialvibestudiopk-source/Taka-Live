@@ -8,7 +8,7 @@ const cors = require("cors");
 const config = require("./config");
 
 const corsOptions = {
-  origin: ["https://taka-live-owner-panel.vercel.app", "http://localhost:5173"], // Specific Vercel URL
+  origin: "*", // Allow all origins for easier debugging during migration
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   preflightContinue: false,
   optionsSuccessStatus: 204,
