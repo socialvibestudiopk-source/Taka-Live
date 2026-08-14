@@ -1,8 +1,14 @@
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
 require('dotenv').config();
 
-const prisma = new PrismaClient({
-  log: ['error', 'warn'],
-});
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required to initialize Prisma.');
+}
+
+// Prisma 7 requires a driver adapter for direct PostgreSQL connections.
+// Using AWS pooler with pgbouncer=true requires explicit adapter handling in some environments.
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 module.exports = prisma;
