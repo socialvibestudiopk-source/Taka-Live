@@ -185,6 +185,34 @@ exports.getLiveUser = async (req, res) => {
   }
 };
 
+// check if user is live
+exports.checkLive = async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) return res.status(200).json({ status: false, message: "userId required" });
+
+    // Try Prisma
+    try {
+        const liveUser = await prisma.liveUser.findFirst({
+            where: { live_user_id: userId }
+        });
+        if (liveUser) {
+            return res.status(200).json({ status: true, message: "User is Live! (Prisma)", liveUser: serialize(liveUser) });
+        }
+    } catch (e) {}
+
+    // Fallback
+    const liveUser = await LiveUser.findOne({ liveUserId: userId });
+    if (liveUser) {
+        return res.status(200).json({ status: true, message: "User is Live! (Legacy)", liveUser });
+    }
+
+    return res.status(200).json({ status: false, message: "User is not Live!" });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
 // terminate live session
 exports.terminateAudioSession = async (req, res) => {
   try {
