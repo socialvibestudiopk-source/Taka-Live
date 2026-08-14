@@ -5,6 +5,13 @@ const { deleteFile } = require("../../util/deleteFile");
 const fs = require("fs");
 const { compressImage } = require("../../util/compressImage");
 
+// Helper to handle BigInt serialization in JSON
+const serialize = (obj) => {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+};
+
 //get all category
 exports.index = async (req, res) => {
   try {
@@ -71,7 +78,7 @@ exports.store = async (req, res) => {
         const category = new Category({ name: req.body.name, image: req.file.path });
         await category.save();
 
-        return res.status(200).json({ status: true, message: "Success (Synced)!", category: sCategory });
+        return res.status(200).json({ status: true, message: "Success (Synced)!", category: serialize(sCategory) });
     } catch (e) { console.warn("Prisma Store Error:", e.message); }
 
     // Fallback
@@ -80,10 +87,79 @@ exports.store = async (req, res) => {
 
     return res.status(200).json({ status: true, message: "Success!", category });
   } catch (error) {
-    deleteFile(req.file);
+    if (req.file) deleteFile(req.file);
     return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// ... update and destroy follow similar hybrid patterns
-// Leaving update/destroy for next iteration or manual sync
+// update category
+exports.update = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    // Try Prisma Update
+    try {
+        const sCategory = await prisma.giftCategory.findUnique({ where: { id: categoryId } });
+        if (sCategory) {
+            let updateData = { name: req.body.name || sCategory.name };
+            if (req.file) {
+                if (fs.existsSync(sCategory.image)) fs.unlinkSync(sCategory.image);
+                compressImage(req.file);
+                updateData.image = req.file.path;
+            }
+            const updated = await prisma.giftCategory.update({
+                where: { id: categoryId },
+                data: updateData
+            });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!", category: serialize(updated) });
+        }
+    } catch (e) {}
+
+    // Fallback
+    const category = await Category.findById(categoryId);
+    if (!category) {
+        if (req.file) deleteFile(req.file);
+        return res.status(200).json({ status: false, message: "Category does not Exist!" });
+    }
+
+    if (req.file) {
+        if (fs.existsSync(category.image)) fs.unlinkSync(category.image);
+        compressImage(req.file);
+        category.image = req.file.path;
+    }
+    category.name = req.body.name || category.name;
+    await category.save();
+
+    return res.status(200).json({ status: true, message: "Success!", category });
+  } catch (error) {
+    if (req.file) deleteFile(req.file);
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// delete category
+exports.destroy = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    // Try Prisma
+    try {
+        const sCategory = await prisma.giftCategory.findUnique({ where: { id: categoryId } });
+        if (sCategory) {
+            if (fs.existsSync(sCategory.image)) fs.unlinkSync(sCategory.image);
+            await prisma.giftCategory.delete({ where: { id: categoryId } });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!" });
+        }
+    } catch (e) {}
+
+    const category = await Category.findById(categoryId);
+    if (!category) return res.status(200).json({ status: false, message: "Category does not Exist!" });
+
+    if (fs.existsSync(category.image)) fs.unlinkSync(category.image);
+    await category.deleteOne();
+
+    return res.status(200).json({ status: true, message: "Success!" });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};

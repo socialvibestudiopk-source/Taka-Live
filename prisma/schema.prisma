@@ -4,6 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -67,6 +69,22 @@ model User {
   following             Follower[] @relation("FollowerFrom")
 
   @@map("users")
+}
+
+model Admin {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String?   @default("Admin")
+  email         String    @unique
+  password      String?
+  image         String?
+  purchase_code String?
+  role          String?   @default("ADMIN")
+  flag          Boolean?  @default(false)
+  supabase_id   String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("admins")
 }
 
 model Follower {

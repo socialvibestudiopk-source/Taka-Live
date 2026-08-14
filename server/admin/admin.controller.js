@@ -1,5 +1,6 @@
 const Admin = require("./admin.model");
 const supabase = require("../../supabase");
+const prisma = require("../../prisma");
 const fs = require("fs");
 const bcrypt = require("bcryptjs");
 const { deleteFile } = require("../../util/deleteFile");
@@ -732,6 +733,16 @@ exports.forgotPassword = async (req, res) => {
 // get all admin [Staff]
 exports.getStaff = async (req, res) => {
   try {
+    // Try Prisma
+    try {
+        const sStaff = await prisma.admin.findMany({
+            select: { id: true, name: true, email: true, role: true, image: true, created_at: true }
+        });
+        if (sStaff && sStaff.length > 0) {
+            return res.status(200).json({ status: true, message: "Success (Prisma)", staff: sStaff });
+        }
+    } catch (e) {}
+
     const staff = await Admin.find().select("-password -purchaseCode");
     return res.status(200).json({ status: true, message: "Success", staff });
   } catch (error) {
@@ -742,7 +753,21 @@ exports.getStaff = async (req, res) => {
 // update staff role
 exports.updateRole = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.params.id);
+    const adminId = req.params.id;
+
+    // Try Prisma
+    try {
+        const sAdmin = await prisma.admin.findUnique({ where: { id: adminId } });
+        if (sAdmin) {
+            const updated = await prisma.admin.update({
+                where: { id: adminId },
+                data: { role: req.body.role }
+            });
+            return res.status(200).json({ status: true, message: "Role updated (Prisma)", staff: updated });
+        }
+    } catch (e) {}
+
+    const admin = await Admin.findById(adminId);
     if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
 
     const { normalizeRole } = require("../middleware/roles");
@@ -763,7 +788,21 @@ exports.updateRole = async (req, res) => {
 // delete staff
 exports.destroy = async (req, res) => {
   try {
-    const admin = await Admin.findById(req.params.id);
+    const adminId = req.params.id;
+
+    // Try Prisma
+    try {
+        const sAdmin = await prisma.admin.findUnique({ where: { id: adminId } });
+        if (sAdmin) {
+            if (["OWNER", "OFFICIAL_OWNER"].includes(sAdmin.role)) {
+                return res.status(200).json({ status: false, message: "System Owner cannot be deleted" });
+            }
+            await prisma.admin.delete({ where: { id: adminId } });
+            return res.status(200).json({ status: true, message: "Staff Deleted (Prisma)" });
+        }
+    } catch (e) {}
+
+    const admin = await Admin.findById(adminId);
     if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
 
     // Protect Owner from being deleted

@@ -112,3 +112,80 @@ exports.store = async (req, res) => {
     return res.status(500).json({ status: false, error: error.message });
   }
 };
+
+// update gift
+exports.update = async (req, res) => {
+  try {
+    const { giftId } = req.params;
+
+    // Try Prisma Update
+    try {
+        const sGift = await prisma.gift.findUnique({ where: { id: giftId } });
+        if (sGift) {
+            let updateData = {
+                name: req.body.name || sGift.name,
+                coin: req.body.coin ? Number(req.body.coin) : sGift.coin,
+                category_id: req.body.category || sGift.category_id,
+                is_lucky: req.body.isLucky !== undefined ? req.body.isLucky === 'true' : sGift.is_lucky
+            };
+            if (req.file) {
+                if (fs.existsSync(sGift.image)) fs.unlinkSync(sGift.image);
+                updateData.image = req.file.path;
+            }
+            const updated = await prisma.gift.update({ where: { id: giftId }, data: updateData });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!", gift: serialize(updated) });
+        }
+    } catch (e) {}
+
+    // Fallback
+    const gift = await Gift.findById(giftId);
+    if (!gift) {
+        if (req.file) deleteFile(req.file);
+        return res.status(200).json({ status: false, message: "Gift does not Exist!" });
+    }
+
+    if (req.file) {
+        if (fs.existsSync(gift.image)) fs.unlinkSync(gift.image);
+        gift.image = req.file.path;
+    }
+    gift.name = req.body.name || gift.name;
+    gift.coin = req.body.coin || gift.coin;
+    gift.category = req.body.category || gift.category;
+    if (req.body.isLucky !== undefined) {
+        gift.isLucky = req.body.isLucky === 'true' || req.body.isLucky === true;
+    }
+    await gift.save();
+
+    return res.status(200).json({ status: true, message: "Success!", gift });
+  } catch (error) {
+    if (req.file) deleteFile(req.file);
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// delete gift
+exports.destroy = async (req, res) => {
+  try {
+    const { giftId } = req.params;
+
+    // Try Prisma
+    try {
+        const sGift = await prisma.gift.findUnique({ where: { id: giftId } });
+        if (sGift) {
+            if (fs.existsSync(sGift.image)) fs.unlinkSync(sGift.image);
+            await prisma.gift.delete({ where: { id: giftId } });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!" });
+        }
+    } catch (e) {}
+
+    const gift = await Gift.findById(giftId);
+    if (!gift) return res.status(200).json({ status: false, message: "Gift does not Exist!" });
+
+    if (fs.existsSync(gift.image)) fs.unlinkSync(gift.image);
+    await gift.deleteOne();
+
+    return res.status(200).json({ status: true, message: "Success!" });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};

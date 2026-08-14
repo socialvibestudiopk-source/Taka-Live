@@ -38,8 +38,8 @@ exports.update = async (req, res) => {
         const updated = await prisma.setting.update({
             where: { id: settingId },
             data: {
-                referral_bonus: Number(req.body.referralBonus),
-                login_bonus: Number(req.body.loginBonus),
+                referral_bonus: req.body.referralBonus ? Number(req.body.referralBonus) : undefined,
+                login_bonus: req.body.loginBonus ? Number(req.body.loginBonus) : undefined,
                 agora_key: req.body.agoraKey,
                 agora_certificate: req.body.agoraCertificate,
                 is_app_active: req.body.isAppActive,
@@ -62,6 +62,41 @@ exports.update = async (req, res) => {
     await setting.save();
 
     return res.status(200).json({ status: true, message: "Settings updated (Legacy)", setting });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// handle setting switch
+exports.handleSwitch = async (req, res) => {
+  try {
+    const { settingId } = req.params;
+    const { type } = req.query;
+
+    // Try Prisma
+    try {
+        const sSetting = await prisma.setting.findUnique({ where: { id: settingId } });
+        if (sSetting) {
+            let data = {};
+            if (type === "googlePlay") data.google_play_switch = !sSetting.google_play_switch;
+            else if (type === "stripe") data.stripe_switch = !sSetting.stripe_switch;
+            else data.is_app_active = !sSetting.is_app_active;
+
+            const updated = await prisma.setting.update({ where: { id: settingId }, data });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", setting: updated });
+        }
+    } catch (e) {}
+
+    // Fallback
+    const setting = await Setting.findById(settingId);
+    if (!setting) return res.status(200).json({ status: false, message: "Setting not found" });
+
+    if (type === "googlePlay") setting.googlePlaySwitch = !setting.googlePlaySwitch;
+    else if (type === "stripe") setting.stripeSwitch = !setting.stripeSwitch;
+    else setting.isAppActive = !setting.isAppActive;
+
+    await setting.save();
+    return res.status(200).json({ status: true, message: "Success!!", setting });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
