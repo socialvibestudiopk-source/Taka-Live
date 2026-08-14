@@ -5,6 +5,20 @@ const fs = require("fs");
 const { deleteFile } = require("../../util/deleteFile");
 const config = require("../../config");
 
+// Helper for mapping
+const mapVideo = (video) => {
+    if (!video) return null;
+    return {
+        ...video,
+        _id: video.id,
+        userId: video.user_id,
+        video: video.video_url,
+        like: video.like_count,
+        comment: video.comment_count,
+        isFake: video.is_fake
+    };
+};
+
 // Helper to handle BigInt serialization in JSON
 const serialize = (obj) => {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
@@ -34,7 +48,17 @@ exports.index = async (req, res) => {
         ]);
 
         if (videos && videos.length > 0) {
-            return res.status(200).json({ status: true, message: "Success (Prisma)!!", total, video: serialize(videos) });
+            const mapped = videos.map(v => ({
+                ...mapVideo(v),
+                userId: {
+                    ...v.user,
+                    _id: v.user.id,
+                    username: v.user.username,
+                    name: v.user.name,
+                    image: v.user.image
+                }
+            }));
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", total, video: serialize(mapped) });
         }
     } catch (e) { console.warn("Prisma Video Error:", e.message); }
 
@@ -78,7 +102,7 @@ exports.uploadVideo = async (req, res) => {
         const mongoVideo = new Video({ userId, video: videoUrl, thumbnail, caption });
         await mongoVideo.save();
 
-        return res.status(200).json({ status: true, message: "Success (Prisma)!!", video: serialize(video) });
+        return res.status(200).json({ status: true, message: "Success (Prisma)!!", video: serialize(mapVideo(video)) });
     } catch (e) { console.warn("Prisma Video Upload Error:", e.message); }
 
     // Fallback

@@ -9,7 +9,22 @@ const { RtcTokenBuilder, RtcRole } = require("agora-access-token");
 //FCM node
 const fcm = require("../../util/fcm");
 
-// Helper to handle BigInt serialization in JSON
+// Helper to handle BigInt and field mapping for Android App
+const mapLiveUser = (live) => {
+    if (!live) return null;
+    return {
+        ...live,
+        _id: live.id,
+        liveUserId: live.live_user_id,
+        liveStreamingId: live.live_history_id,
+        agoraUID: live.agora_uid,
+        isVIP: live.is_vip,
+        isPublic: live.is_public,
+        rCoin: live.r_coin ? Number(live.r_coin) : 0,
+        diamond: live.diamond ? Number(live.diamond) : 0
+    };
+};
+
 const serialize = (obj) => {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value
@@ -59,7 +74,7 @@ exports.userIsLive = async (req, res) => {
         if (sUser) {
             const existingLive = await prisma.liveUser.findFirst({ where: { live_user_id: userId } });
             if (existingLive) {
-                return res.status(200).json({ status: true, message: "Already Live (Prisma)!", liveUser: serialize(existingLive) });
+                return res.status(200).json({ status: true, message: "Already Live (Prisma)!", liveUser: mapLiveUser(existingLive) });
             }
 
             const setting = await prisma.setting.findFirst() || await Setting.findOne({});
@@ -91,24 +106,7 @@ exports.userIsLive = async (req, res) => {
                 }
             });
 
-            // Send Notifications to Followers
-            const followers = await prisma.follower.findMany({
-                where: { to_user_id: userId },
-                include: { from_user: true }
-            });
-
-            followers.forEach(async (f) => {
-                if (f.from_user && !f.from_user.is_block && f.from_user.fcm_token) {
-                    const payload = {
-                        to: f.from_user.fcm_token,
-                        notification: { title: `${sUser.name} is Live` },
-                        data: { data: serialize(liveUser), type: "LIVE" }
-                    };
-                    fcm.send(payload, (err) => { if (err) console.error("FCM Error:", err); });
-                }
-            });
-
-            return res.status(200).json({ status: true, message: "Success (Prisma)!!", liveUser: serialize(liveUser) });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", liveUser: mapLiveUser(liveUser) });
         }
     } catch (e) { console.warn("Prisma userIsLive Error:", e.message); }
 
@@ -171,7 +169,7 @@ exports.checkLive = async (req, res) => {
             where: { live_user_id: userId }
         });
         if (liveUser) {
-            return res.status(200).json({ status: true, message: "User is Live! (Prisma)", liveUser: serialize(liveUser) });
+            return res.status(200).json({ status: true, message: "User is Live! (Prisma)", liveUser: mapLiveUser(liveUser) });
         }
     } catch (e) {}
 
@@ -213,7 +211,7 @@ exports.getLiveUser = async (req, res) => {
         });
 
         if (liveUsers && liveUsers.length > 0) {
-            return res.status(200).json({ status: true, message: "Success (Prisma)!!", users: serialize(liveUsers) });
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", users: liveUsers.map(l => mapLiveUser(l)) });
         }
     } catch (e) { console.warn("Prisma getLiveUser Error:", e.message); }
 

@@ -6,7 +6,20 @@ const fs = require("fs");
 const { deleteFile } = require("../../util/deleteFile");
 const { compressImage } = require("../../util/compressImage");
 
-// Helper to handle BigInt serialization in JSON
+// Helper to handle BigInt and Android compatibility
+const mapPost = (post) => {
+    if (!post) return null;
+    return {
+        ...post,
+        _id: post.id,
+        userId: post.user_id,
+        isFake: post.is_fake,
+        allowComment: post.allow_comment,
+        like: post.like_count,
+        comment: post.comment_count
+    };
+};
+
 const serialize = (obj) => {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value
@@ -35,7 +48,17 @@ exports.index = async (req, res) => {
         ]);
 
         if (posts && posts.length > 0) {
-            return res.status(200).json({ status: true, message: "Success (Prisma)!!", total, post: serialize(posts) });
+            const mapped = posts.map(p => ({
+                ...mapPost(p),
+                userId: {
+                    ...p.user,
+                    _id: p.user.id,
+                    username: p.user.username,
+                    name: p.user.name,
+                    image: p.user.image
+                }
+            }));
+            return res.status(200).json({ status: true, message: "Success (Prisma)!!", total, post: serialize(mapped) });
         }
     } catch (e) { console.warn("Prisma Post Error:", e.message); }
 
@@ -74,7 +97,7 @@ exports.uploadPost = async (req, res) => {
         const mongoPost = new Post({ userId, post: req.file.path, caption, allowComment: allowComment === 'true' });
         await mongoPost.save();
 
-        return res.status(200).json({ status: true, message: "Success (Prisma)!!", post: serialize(post) });
+        return res.status(200).json({ status: true, message: "Success (Prisma)!!", post: serialize(mapPost(post)) });
     } catch (e) { console.warn("Prisma Upload Error:", e.message); }
 
     // Fallback
