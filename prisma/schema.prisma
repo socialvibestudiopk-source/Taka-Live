@@ -57,7 +57,9 @@ model User {
   favorites             Favorite[]
   followers             Follower[] @relation("FollowerTo")
   following             Follower[] @relation("FollowerFrom")
-  live_sessions         LiveUser[]
+  live_sessions         LiveUser[] @relation("UserLiveSessions")
+  live_history          LiveStreamingHistory[] @relation("UserLiveHistory")
+  generic_invitations   Invitation[] @relation("TargetUserGenericInvites")
 
   @@map("users")
 }
@@ -212,6 +214,7 @@ model Invitation {
 model Wallet {
   id              String    @id @default(uuid()) @db.Uuid
   user_id         String?   @db.Uuid
+  other_user_id   String?   @db.Uuid
   type            Int?
   diamond         BigInt?   @default(0)
   r_coin          BigInt?   @default(0)
@@ -219,7 +222,7 @@ model Wallet {
   date            DateTime? @default(now()) @db.Timestamptz(6)
 
   user            User?     @relation("UserWallet", fields: [user_id], references: [id])
-  other_user      User?     @relation("OtherUserWallet", fields: [user_id], references: [id])
+  other_user      User?     @relation("OtherUserWallet", fields: [other_user_id], references: [id])
 
   @@map("wallet")
 }
@@ -231,7 +234,7 @@ model LiveUser {
   live_user_id    String?   @db.Uuid
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation(fields: [live_user_id], references: [id])
+  user            User?     @relation("UserLiveSessions", fields: [live_user_id], references: [id])
 
   @@map("live_users")
 }
@@ -241,7 +244,7 @@ model LiveStreamingHistory {
   user_id         String?   @db.Uuid
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation(fields: [user_id], references: [id])
+  user            User?     @relation("UserLiveHistory", fields: [user_id], references: [id])
 
   @@map("live_streaming_history")
 }
