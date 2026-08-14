@@ -54,7 +54,7 @@ exports.index = async (req, res) => {
 // upload video
 exports.uploadVideo = async (req, res) => {
   try {
-    const { userId, caption, location, allowComment } = req.body;
+    const { userId, caption } = req.body;
     if (!req.files.video || !userId) {
         if (req.files.video) deleteFile(req.files.video[0]);
         return res.status(200).json({ status: false, message: "Invalid Details!" });
@@ -88,4 +88,50 @@ exports.uploadVideo = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
+};
+
+// get video
+exports.getVideo = async (req, res) => {
+    try {
+        const videos = await Video.find({ isDelete: false }).populate("userId").sort({ createdAt: -1 }).limit(20);
+        return res.status(200).json({ status: true, message: "Success!!", video: videos });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// get video by id
+exports.getVideoById = async (req, res) => {
+    try {
+        const video = await Video.findById(req.query.videoId).populate("userId");
+        return res.status(200).json({ status: true, message: "Success!!", video });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// allow disallow comment
+exports.allowDisallowComment = async (req, res) => {
+    try {
+        const video = await Video.findById(req.params.videoId);
+        if (!video) return res.status(200).json({ status: false, message: "Video not found" });
+        video.allowComment = !video.allowComment;
+        await video.save();
+        return res.status(200).json({ status: true, message: "Success!!", video });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// destroy video
+exports.destroy = async (req, res) => {
+    try {
+        const video = await Video.findById(req.query.videoId);
+        if (!video) return res.status(200).json({ status: false, message: "Video not found" });
+        if (fs.existsSync(video.video)) fs.unlinkSync(video.video);
+        await video.deleteOne();
+        return res.status(200).json({ status: true, message: "Success!!" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
 };

@@ -55,7 +55,7 @@ exports.index = async (req, res) => {
 // upload post
 exports.uploadPost = async (req, res) => {
   try {
-    const { userId, caption, location, allowComment } = req.body;
+    const { userId, caption, allowComment } = req.body;
     if (!req.file || !userId) return res.status(200).json({ status: false, message: "Invalid Details!" });
 
     compressImage(req.file);
@@ -87,4 +87,68 @@ exports.uploadPost = async (req, res) => {
   }
 };
 
-// More methods (Popular, Following, UserPosts) would follow the same hybrid pattern...
+// get popular and latest post list
+exports.getPopularLatestPosts = async (req, res) => {
+    try {
+        const posts = await Post.find({ isDelete: false }).populate("userId").sort({ createdAt: -1 }).limit(20);
+        return res.status(200).json({ status: true, message: "Success!!", post: posts });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// get following post list
+exports.getFollowingPosts = async (req, res) => {
+    try {
+        const posts = await Post.find({ isDelete: false }).populate("userId").sort({ createdAt: -1 }).limit(20);
+        return res.status(200).json({ status: true, message: "Success!!", post: posts });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// get users post list
+exports.getUserPosts = async (req, res) => {
+    try {
+        const posts = await Post.find({ userId: req.query.userId, isDelete: false }).populate("userId").sort({ createdAt: -1 });
+        return res.status(200).json({ status: true, message: "Success!!", post: posts });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// allow disallow comment
+exports.allowDisallowComment = async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.postId);
+        if (!post) return res.status(200).json({ status: false, message: "Post not found" });
+        post.allowComment = !post.allowComment;
+        await post.save();
+        return res.status(200).json({ status: true, message: "Success!!", post });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// destroy post
+exports.destroy = async (req, res) => {
+    try {
+        const post = await Post.findById(req.query.postId);
+        if (!post) return res.status(200).json({ status: false, message: "Post not found" });
+        if (fs.existsSync(post.post)) fs.unlinkSync(post.post);
+        await post.deleteOne();
+        return res.status(200).json({ status: true, message: "Success!!" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// get post by id
+exports.getPostById = async (req, res) => {
+    try {
+        const post = await Post.findById(req.query.postId).populate("userId");
+        return res.status(200).json({ status: true, message: "Success!!", post });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
