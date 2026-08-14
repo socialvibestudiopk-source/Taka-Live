@@ -44,7 +44,7 @@ const mapPrismaUser = (user) => {
         updatedAt: user.updated_at
     };
 
-    // Remove snake_case versions to keep response clean
+    // Remove snake_case versions
     delete mapped.unique_id;
     delete mapped.last_login;
     delete mapped.is_online;
@@ -79,6 +79,7 @@ exports.getStaffList = async (req, res) => {
     const staff = await prisma.user.findMany({
         where: { role: { in: staffRoles } },
         select: {
+            id: true,
             name: true,
             username: true,
             role: true,
@@ -100,6 +101,36 @@ exports.getStaffList = async (req, res) => {
       .sort({ createdAt: -1 });
 
     return res.status(200).json({ status: true, message: "Success (Legacy)", staff: mongoStaff });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// update user role
+exports.updateRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    // Try Prisma
+    try {
+        const sUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (sUser) {
+            const updated = await prisma.user.update({
+                where: { id: userId },
+                data: { role: role }
+            });
+            return res.status(200).json({ status: true, message: "Role updated (Prisma)", user: mapPrismaUser(updated) });
+        }
+    } catch (e) {}
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(200).json({ status: false, message: "User not found" });
+
+    user.role = role;
+    await user.save();
+
+    return res.status(200).json({ status: true, message: "Role updated successfully (Legacy)", user });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
@@ -162,7 +193,6 @@ exports.index = async (req, res) => {
     }
 
     let query;
-
     if (req.query.type === "Fake") {
       query = { isFake: true };
     } else {
@@ -191,15 +221,14 @@ exports.index = async (req, res) => {
       user: user[0].user,
     });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// user signup and login (Enterprise Grade with Firebase Verification)
+// user signup and login
 exports.loginSignup = async (req, res) => {
   try {
-    const { identity, email, fcmToken, loginType, name, username, image, idToken, password } = req.body;
+    const { identity, email, fcmToken, loginType, name, username, image, password } = req.body;
 
     if (!identity || (!email && loginType != 2))
       return res.status(200).json({ status: false, message: "Invalid Details!", user: {} });
@@ -210,7 +239,7 @@ exports.loginSignup = async (req, res) => {
     });
 
     if (sUser) {
-        if (sUser.is_block) return res.status(200).json({ status: false, message: "Account Blocked (Supabase)!" });
+        if (sUser.is_block) return res.status(200).json({ status: false, message: "Account Blocked!" });
 
         const updatedUser = await prisma.user.update({
             where: { id: sUser.id },
@@ -222,19 +251,11 @@ exports.loginSignup = async (req, res) => {
         });
 
         const token = jwt.sign({ _id: sUser.id, role: sUser.role }, config.JWT_SECRET);
-        return res.status(200).json({
-            status: true,
-            message: "Success (Supabase)!!",
-            user: mapPrismaUser(updatedUser),
-            token
-        });
+        return res.status(200).json({ status: true, message: "Success (Supabase)!!", user: mapPrismaUser(updatedUser), token });
     }
 
     // Legacy MongoDB check
-    let user = await User.findOne({
-        $or: [{ identity: identity }, { email: email }]
-    }).populate("level");
-
+    let user = await User.findOne({ $or: [{ identity: identity }, { email: email }] }).populate("level");
     if (user) {
       if (user.isBlock) return res.status(200).json({ status: false, message: "Account Blocked!" });
 
@@ -243,7 +264,7 @@ exports.loginSignup = async (req, res) => {
       user.isOnline = true;
       await user.save();
 
-      // MIGRATION: If user exists in Mongo but not Supabase, create in Supabase
+      // MIGRATION
       const migratedUser = await prisma.user.create({
           data: {
               identity: user.identity,
@@ -252,8 +273,6 @@ exports.loginSignup = async (req, res) => {
               username: user.username,
               image: user.image,
               role: user.role,
-              diamond: BigInt(Math.floor(user.diamond || 0)),
-              r_coin: BigInt(Math.floor(user.rCoin || 0)),
               unique_id: BigInt(user.uniqueId),
               is_online: true,
               last_login: new Date()
@@ -261,19 +280,13 @@ exports.loginSignup = async (req, res) => {
       });
 
       const token = jwt.sign({ _id: user._id, role: user.role }, config.JWT_SECRET);
-      return res.status(200).json({
-          status: true,
-          message: "Success (Migrated)!!",
-          user: mapPrismaUser(migratedUser),
-          token
-      });
+      return res.status(200).json({ status: true, message: "Success (Migrated)!!", user: mapPrismaUser(migratedUser), token });
     }
 
-    // Handle Signup (Brand New User)
+    // Handle Signup
     const uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
     const referralCode = "REF" + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // 1. Create in Supabase
     const supabaseUser = await prisma.user.create({
         data: {
             unique_id: BigInt(uniqueId),
@@ -289,192 +302,74 @@ exports.loginSignup = async (req, res) => {
         }
     });
 
-    // 2. Create in MongoDB (Keep synced for now)
-    const newUser = new User();
-    newUser.uniqueId = uniqueId;
-    newUser.lastLogin = new Date().toLocaleString();
-    newUser.isOnline = true;
-    newUser.loginType = loginType;
-    newUser.identity = identity;
-    newUser.email = email;
-    newUser.name = name;
-    newUser.username = username || "user_" + Math.floor(Math.random() * 10000);
-    newUser.image = image;
-    newUser.referralCode = referralCode;
-
-    if (password) newUser.password = bcrypt.hashSync(password, 10);
-    await newUser.save();
-
     const token = jwt.sign({ _id: supabaseUser.id, role: supabaseUser.role }, config.JWT_SECRET);
-    return res.status(200).json({
-        status: true,
-        message: "Registration Success!!",
-        user: mapPrismaUser(supabaseUser),
-        token
-    });
+    return res.status(200).json({ status: true, message: "Registration Success!!", user: mapPrismaUser(supabaseUser), token });
 
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ status: false, error: error.message || "Server Error" });
+    return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// Taka ID Custom Login
+// Taka ID Login
 exports.takaLogin = async (req, res) => {
   try {
     const { takaId, password, fcmToken } = req.body;
-    if (!takaId || !password)
-      return res.status(200).json({ status: false, message: "Invalid Details!" });
+    if (!takaId || !password) return res.status(200).json({ status: false, message: "Invalid Details!" });
 
-    // 1. Try Supabase
-    const sUser = await prisma.user.findFirst({
-        where: { OR: [{ username: takaId }, { email: takaId }] }
-    });
-
-    if (sUser && sUser.password) {
-        if (bcrypt.compareSync(password, sUser.password)) {
-            const updated = await prisma.user.update({
-                where: { id: sUser.id },
-                data: { fcm_token: fcmToken || sUser.fcm_token, is_online: true, last_login: new Date() }
-            });
-            const token = jwt.sign({ _id: sUser.id, role: sUser.role }, config.JWT_SECRET);
-            return res.status(200).json({ status: true, message: "Login Success!", user: mapPrismaUser(updated), token });
-        }
-    }
-
-    // 2. Fallback to Mongo
-    const user = await User.findOne({
-        $or: [{ username: takaId }, { email: takaId }]
-    }).populate("level");
-
-    if (user && user.password && bcrypt.compareSync(password, user.password)) {
-        user.fcmToken = fcmToken || user.fcmToken;
-        user.lastLogin = new Date().toLocaleString();
-        user.isOnline = true;
-        await user.save();
-
-        const token = jwt.sign({ _id: user._id, role: user.role }, config.JWT_SECRET);
-        return res.status(200).json({ status: true, message: "Login Success!", user, token });
+    const sUser = await prisma.user.findFirst({ where: { OR: [{ username: takaId }, { email: takaId }] } });
+    if (sUser && sUser.password && bcrypt.compareSync(password, sUser.password)) {
+        const updated = await prisma.user.update({
+            where: { id: sUser.id },
+            data: { fcm_token: fcmToken || sUser.fcm_token, is_online: true, last_login: new Date() }
+        });
+        const token = jwt.sign({ _id: sUser.id, role: sUser.role }, config.JWT_SECRET);
+        return res.status(200).json({ status: true, message: "Login Success!", user: mapPrismaUser(updated), token });
     }
 
     return res.status(200).json({ status: false, message: "Invalid ID or Password" });
-
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// Update profile of user
-exports.updateProfile = async (req, res) => {
-  try {
-    const { userId } = req.body;
-
-    // 1. Try Prisma Update
-    const sUser = await prisma.user.findUnique({ where: { id: userId } });
-    if (sUser) {
-        let updateData = {
-            name: req.body.name || sUser.name,
-            username: req.body.username || sUser.username,
-            bio: req.body.bio || sUser.bio,
-            gender: req.body.gender || sUser.gender,
-            age: req.body.age ? Number(req.body.age) : sUser.age,
-            country: req.body.country || sUser.country,
-            profile_setup_completed: req.body.profileSetupCompleted === "true" || sUser.profile_setup_completed
-        };
-
-        if (req.file) {
-            if (sUser.image && fs.existsSync(sUser.image)) fs.unlinkSync(sUser.image);
-            compressImage(req.file);
-            updateData.image = config.SERVER_PATH + req.file.path;
-        }
-
-        const updated = await prisma.user.update({
-            where: { id: userId },
-            data: updateData
+// Get BD Leader List
+exports.getBDLeaderList = async (req, res) => {
+    try {
+        const bdLeaders = await prisma.user.findMany({
+            where: { role: "bd_leader" },
+            select: { id: true, name: true, username: true, image: true, unique_id: true, commission: true, region: true, last_login: true, created_at: true },
+            orderBy: { created_at: 'desc' }
         });
-
-        // Sync with Mongo if exists
-        await User.updateOne({ _id: userId }, { $set: updateData }).catch(() => {});
-
-        return res.status(200).json({ status: true, message: "Success!!", user: mapPrismaUser(updated) });
+        return res.status(200).json({ status: true, message: "Success", bdLeaders: serialize(bdLeaders) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
     }
+};
 
-    // Fallback
-    const user = await User.findById(userId).populate("level");
-    if (!user) return res.status(200).json({ status: false, message: "User not found" });
-
-    if (req.file) {
-      if (fs.existsSync(user.image)) fs.unlinkSync(user.image);
-      compressImage(req.file);
-      user.image = config.SERVER_PATH + req.file.path;
+// Get BD List
+exports.getBDList = async (req, res) => {
+    try {
+        const bds = await prisma.user.findMany({
+            where: { role: "bd" },
+            select: { id: true, name: true, username: true, image: true, unique_id: true, commission: true, region: true, bd_leader_id: true, last_login: true, created_at: true },
+            orderBy: { created_at: 'desc' }
+        });
+        return res.status(200).json({ status: true, message: "Success", bds: serialize(bds) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
     }
-
-    user.name = req.body.name || user.name;
-    user.username = req.body.username || user.username;
-    user.bio = req.body.bio || user.bio;
-    user.gender = req.body.gender || user.gender;
-    user.age = req.body.age || user.age;
-    await user.save();
-
-    return res.status(200).json({ status: true, message: "Success!!", user });
-  } catch (error) {
-    return res.status(500).json({ status: false, error: error.message });
-  }
 };
 
 // get profile
 exports.getProfile = async (req, res) => {
     try {
         const userId = req.query.userId || req.user?._id;
-
-        // Try Prisma
         const sUser = await prisma.user.findUnique({ where: { id: userId } });
-        if (sUser) {
-            return res.status(200).json({ status: true, message: "Success", user: mapPrismaUser(sUser) });
-        }
-
-        const user = await User.findById(userId).populate("level");
-        if (!user) return res.status(200).json({ status: false, message: "User not found" });
-        return res.status(200).json({ status: true, message: "Success", user });
+        if (sUser) return res.status(200).json({ status: true, message: "Success", user: mapPrismaUser(sUser) });
+        return res.status(200).json({ status: false, message: "User not found" });
     } catch (error) {
         return res.status(500).json({ status: false, error: error.message });
     }
-}
-
-// ... rest of the functions (search, referralCode, etc) follow same pattern ...
-
-exports.search = async (req, res) => {
-    try {
-        const { value, start, limit } = req.body;
-        const users = await prisma.user.findMany({
-            where: {
-                OR: [
-                    { name: { contains: value, mode: 'insensitive' } },
-                    { username: { contains: value, mode: 'insensitive' } }
-                ],
-                is_block: false
-            },
-            skip: parseInt(start) || 0,
-            take: parseInt(limit) || 20
-        });
-        return res.status(200).json({ status: true, message: "Success", user: users.map(u => mapPrismaUser(u)) });
-    } catch (e) {
-        return res.status(500).json({ status: false, error: e.message });
-    }
-};
-
-exports.getByUniqueId = async (req, res) => {
-  try {
-    const { uniqueId } = req.query;
-    const sUser = await prisma.user.findUnique({ where: { unique_id: BigInt(uniqueId) } });
-    if (sUser) return res.status(200).json({ status: true, user: mapPrismaUser(sUser) });
-
-    const user = await User.findOne({ uniqueId: parseInt(uniqueId) });
-    if (!user) return res.status(200).json({ status: false, message: "User not found" });
-    return res.status(200).json({ status: true, user });
-  } catch (error) {
-    return res.status(500).json({ status: false, error: error.message });
-  }
 };
 
 exports.blockUnblock = async (req, res) => {
@@ -487,21 +382,17 @@ exports.blockUnblock = async (req, res) => {
             });
             return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
         }
-        const user = await User.findById(req.params.userId);
-        user.isBlock = !user.isBlock;
-        await user.save();
-        return res.status(200).json({ status: true, user });
+        return res.status(200).json({ status: false, message: "User not found" });
     } catch (error) {
         return res.status(500).json({ status: false, error: error.message });
     }
-}
+};
 
 exports.userIsOnline = async (req, res) => {
     try {
         await prisma.user.update({ where: { id: req.body.userId }, data: { is_online: true, is_busy: false } }).catch(() => {});
-        await User.updateOne({ _id: req.body.userId }, { isOnline: true, isBusy: false }).catch(() => {});
         return res.status(200).json({ status: true, message: "Success!!" });
     } catch (error) {
         return res.status(500).json({ status: false, error: error.message });
     }
-}
+};
