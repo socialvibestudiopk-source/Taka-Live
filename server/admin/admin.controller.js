@@ -18,20 +18,47 @@ exports.login = async (req, res) => {
     if (!email || !password)
       return res.status(200).json({ status: false, message: "Invalid details!" });
 
-    // 1. Try Supabase Auth First
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password
-    });
+    // 1. EMERGENCY BYPASS FOR OWNER (Works even if all DBs are down)
+    // Using credentials from .env
+    if (email === process.env.OWNER_EMAIL && password === process.env.OWNER_BOOTSTRAP_PASSWORD) {
+        console.log("Emergency Login Triggered for Owner");
 
-    if (!authData.user) {
-         // Log the actual error for debugging
-         console.warn("Supabase Auth Failed:", authError?.message);
+        // Auto-Seed in Supabase if not exists
+        try {
+            const sAdmin = await prisma.admin.findUnique({ where: { email: email } });
+            if (!sAdmin) {
+                await prisma.admin.create({
+                    data: {
+                        name: "System Owner",
+                        email: email,
+                        password: bcrypt.hashSync(password, 10),
+                        role: "OWNER",
+                        flag: true,
+                        purchase_code: process.env.OWNER_LICENSE || "MY-LICENCE-587385"
+                    }
+                });
+                console.log("Owner Seeded in Supabase via Login");
+            }
+        } catch (e) { console.error("Auto-Seed Error:", e.message); }
+
+        const payload = { _id: "SYSTEM_OWNER", name: "Owner", email: email, role: "OWNER" };
+        const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
+        return res.status(200).json({
+            status: true,
+            message: "Emergency Login Success!!",
+            token,
+            admin: payload
+        });
     }
 
-    if (!authError && authData.user) {
-        // Find Admin via PRISMA (Supabase SQL) - Mongo se azadi!
-        try {
+    // 2. Try Supabase Auth
+    try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        if (!authError && authData.user) {
             const sAdmin = await prisma.admin.findFirst({
                 where: { OR: [{ email: email }, { supabase_id: authData.user.id }] }
             });
@@ -45,35 +72,30 @@ exports.login = async (req, res) => {
                     supabaseId: authData.user.id
                  };
                  const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
-                 return res.status(200).json({
-                    status: true,
-                    message: "Success (Supabase Auth)!!",
-                    token,
-                    admin: payload
-                 });
+                 return res.status(200).json({ status: true, message: "Success (Supabase Auth)!!", token, admin: payload });
             }
-        } catch (e) { console.warn("Prisma Admin Lookup Error:", e.message); }
-    }
+        }
+    } catch (e) {}
 
-    // 2. Legacy MongoDB Fallback (Only if Mongo is connected)
+    // 3. Try Prisma directly (if user exists in admins table but not Supabase Auth)
+    try {
+        const sAdmin = await prisma.admin.findUnique({ where: { email: email } });
+        if (sAdmin && bcrypt.compareSync(password, sAdmin.password)) {
+            const payload = { _id: sAdmin.id, name: sAdmin.name, email: sAdmin.email, role: sAdmin.role };
+            const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
+            return res.status(200).json({ status: true, message: "Success (Prisma Auth)!!", token, admin: payload });
+        }
+    } catch (e) {}
+
+    // 4. Legacy MongoDB Fallback
     const mongoose = require("mongoose");
     if (mongoose.connection.readyState === 1) {
         const admin = await Admin.findOne({ email: email });
-        if (admin) {
-            const isPassword = bcrypt.compareSync(password, admin.password);
-            if (isPassword) {
-                const payload = { _id: admin._id.toString(), name: admin.name, email: admin.email, role: admin.role };
-                const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
-                return res.status(200).json({ status: true, message: "Success (Legacy Auth)!!", token, admin: payload });
-            }
+        if (admin && bcrypt.compareSync(password, admin.password)) {
+            const payload = { _id: admin._id.toString(), name: admin.name, email: admin.email, role: admin.role };
+            const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
+            return res.status(200).json({ status: true, message: "Success (Legacy Auth)!!", token, admin: payload });
         }
-    }
-
-    // 3. FINAL BYPASS for Owners (If configured in .env)
-    if (email === process.env.OWNER_EMAIL && password === process.env.OWNER_BOOTSTRAP_PASSWORD) {
-        const payload = { _id: "SYSTEM_OWNER", name: "Owner", email: email, role: "OWNER" };
-        const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
-        return res.status(200).json({ status: true, message: "Emergency Login Success!!", token, admin: payload });
     }
 
     return res.status(200).json({ status: false, message: "Invalid Credentials or Database Disconnected" });
