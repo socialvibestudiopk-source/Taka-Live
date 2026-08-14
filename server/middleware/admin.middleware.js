@@ -21,16 +21,6 @@ module.exports = async (req, res, next) => {
         // Find corresponding admin by email or supabase id
         let admin = await Admin.findOne({ $or: [{ email: user.email }, { supabaseId: user.id }] });
 
-        // AUTO-SEED: If official email logged in via Supabase, make them admin if not exist
-        if (!admin && user.email === "socialvibestudiopk@gmail.com") {
-             admin = new Admin({
-                 email: user.email,
-                 role: 'OWNER',
-                 supabaseId: user.id
-             });
-             await admin.save();
-        }
-
         if (admin) {
             req.admin = admin;
             return next();

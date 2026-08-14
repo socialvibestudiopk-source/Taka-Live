@@ -271,9 +271,14 @@ mongoose.connect(MONGODB_URI, {
     await Permission.findOneAndUpdate({ name: p.name }, p, { upsert: true });
   }
 
-  const ownerEmail = "socialvibestudiopk@gmail.com";
-  const ownerPassword = "(hmh874)";
-  const ownerLicense = "MY-LICENCE-587385";
+  const ownerEmail = process.env.OWNER_EMAIL;
+  const ownerPassword = process.env.OWNER_BOOTSTRAP_PASSWORD;
+  const ownerLicense = process.env.OWNER_LICENSE;
+
+  if (!ownerEmail || !ownerPassword || !ownerLicense) {
+    console.warn("OWNER bootstrap skipped: OWNER_EMAIL, OWNER_BOOTSTRAP_PASSWORD, and OWNER_LICENSE must be set.");
+    return;
+  }
 
   try {
     const adminExist = await Admin.findOne({ email: ownerEmail });

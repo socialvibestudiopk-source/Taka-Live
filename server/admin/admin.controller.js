@@ -126,11 +126,6 @@ exports.login = async (req, res) => {
     if (!authError && authData.user) {
         let admin = await Admin.findOne({ $or: [{ email: req.body.email }, { supabaseId: authData.user.id }] });
 
-        if (!admin && req.body.email === "socialvibestudiopk@gmail.com") {
-             admin = new Admin({ email: req.body.email, role: 'OWNER', supabaseId: authData.user.id });
-             await admin.save();
-        }
-
         if (admin) {
              const payload = {
                 _id: admin._id.toString(),
@@ -139,10 +134,11 @@ exports.login = async (req, res) => {
                 role: admin.role,
                 supabaseId: authData.user.id
              };
+             const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "8h" });
              return res.status(200).json({
                 status: true,
                 message: "Success (Supabase Auth)!!",
-                token: authData.session.access_token,
+                token,
                 admin: payload
              });
         }
@@ -166,7 +162,7 @@ exports.login = async (req, res) => {
       role: admin.role,
     };
 
-    const token = jwt.sign(payload, config.JWT_SECRET);
+    const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "8h" });
 
     return res.status(200).json({
         status: true,
@@ -749,7 +745,13 @@ exports.updateRole = async (req, res) => {
     const admin = await Admin.findById(req.params.id);
     if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
 
-    admin.role = req.body.role || admin.role;
+    const { normalizeRole } = require("../middleware/roles");
+    const allowedRoles = ["MANAGER", "SUPER_ADMIN", "ADMIN", "BD_LEADER", "BD", "AGENCY", "HOST", "COIN_SELLER"];
+    const nextRole = normalizeRole(req.body.role || admin.role);
+    if (!allowedRoles.includes(nextRole)) {
+      return res.status(400).json({ status: false, message: "Invalid staff role" });
+    }
+    admin.role = nextRole;
     await admin.save();
 
     return res.status(200).json({ status: true, message: "Role updated successfully", staff: admin });
@@ -765,7 +767,7 @@ exports.destroy = async (req, res) => {
     if (!admin) return res.status(200).json({ status: false, message: "Staff not found" });
 
     // Protect Owner from being deleted
-    if (admin.email === "socialvibestudiopk@gmail.com") {
+    if (["OWNER", "OFFICIAL_OWNER"].includes(admin.role)) {
       return res.status(200).json({ status: false, message: "System Owner cannot be deleted" });
     }
 

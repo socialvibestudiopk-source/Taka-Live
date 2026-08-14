@@ -9,6 +9,7 @@ const upload = multer({
 const AdminController = require("./admin.controller");
 
 const AdminMiddleware = require("../middleware/admin.middleware");
+const { requireRole } = require("../middleware/roles");
 
 //get admin profile
 router.get("/profile", AdminMiddleware, AdminController.getProfile);
@@ -50,8 +51,8 @@ router.post("/sendEmail", AdminController.forgotPassword);
 router.post("/setPassword/:adminId", AdminController.setPassword);
 
 // Staff Management
-router.get("/getStaff", AdminMiddleware, AdminController.getStaff);
-router.patch("/updateRole/:id", AdminMiddleware, AdminController.updateRole);
-router.delete("/:id", AdminMiddleware, AdminController.destroy);
+router.get("/getStaff", AdminMiddleware, requireRole("OWNER", "OFFICIAL_OWNER", "SUPER_ADMIN", "MANAGER"), AdminController.getStaff);
+router.patch("/updateRole/:id", AdminMiddleware, requireRole("OWNER", "OFFICIAL_OWNER", "SUPER_ADMIN"), AdminController.updateRole);
+router.delete("/:id", AdminMiddleware, requireRole("OWNER", "OFFICIAL_OWNER", "SUPER_ADMIN"), AdminController.destroy);
 
 module.exports = router;
