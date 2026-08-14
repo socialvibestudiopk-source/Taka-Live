@@ -91,6 +91,23 @@ exports.userIsLive = async (req, res) => {
                 }
             });
 
+            // Send Notifications to Followers
+            const followers = await prisma.follower.findMany({
+                where: { to_user_id: userId },
+                include: { from_user: true }
+            });
+
+            followers.forEach(async (f) => {
+                if (f.from_user && !f.from_user.is_block && f.from_user.fcm_token) {
+                    const payload = {
+                        to: f.from_user.fcm_token,
+                        notification: { title: `${sUser.name} is Live` },
+                        data: { data: serialize(liveUser), type: "LIVE" }
+                    };
+                    fcm.send(payload, (err) => { if (err) console.error("FCM Error:", err); });
+                }
+            });
+
             return res.status(200).json({ status: true, message: "Success (Prisma)!!", liveUser: serialize(liveUser) });
         }
     } catch (e) { console.warn("Prisma userIsLive Error:", e.message); }
@@ -142,6 +159,34 @@ exports.userIsLive = async (req, res) => {
   }
 };
 
+// check if user is live
+exports.checkLive = async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) return res.status(200).json({ status: false, message: "userId required" });
+
+    // Try Prisma
+    try {
+        const liveUser = await prisma.liveUser.findFirst({
+            where: { live_user_id: userId }
+        });
+        if (liveUser) {
+            return res.status(200).json({ status: true, message: "User is Live! (Prisma)", liveUser: serialize(liveUser) });
+        }
+    } catch (e) {}
+
+    // Fallback
+    const liveUser = await LiveUser.findOne({ liveUserId: userId });
+    if (liveUser) {
+        return res.status(200).json({ status: true, message: "User is Live! (Legacy)", liveUser });
+    }
+
+    return res.status(200).json({ status: false, message: "User is not Live!" });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
 // get live user list
 exports.getLiveUser = async (req, res) => {
   try {
@@ -180,34 +225,6 @@ exports.getLiveUser = async (req, res) => {
         .limit(limit);
 
     return res.status(200).json({ status: true, message: "Success (Legacy)!!", users });
-  } catch (error) {
-    return res.status(500).json({ status: false, error: error.message });
-  }
-};
-
-// check if user is live
-exports.checkLive = async (req, res) => {
-  try {
-    const userId = req.query.userId;
-    if (!userId) return res.status(200).json({ status: false, message: "userId required" });
-
-    // Try Prisma
-    try {
-        const liveUser = await prisma.liveUser.findFirst({
-            where: { live_user_id: userId }
-        });
-        if (liveUser) {
-            return res.status(200).json({ status: true, message: "User is Live! (Prisma)", liveUser: serialize(liveUser) });
-        }
-    } catch (e) {}
-
-    // Fallback
-    const liveUser = await LiveUser.findOne({ liveUserId: userId });
-    if (liveUser) {
-        return res.status(200).json({ status: true, message: "User is Live! (Legacy)", liveUser });
-    }
-
-    return res.status(200).json({ status: false, message: "User is not Live!" });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
