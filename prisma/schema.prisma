@@ -4,8 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -49,19 +47,19 @@ model User {
   updated_at            DateTime? @default(now()) @db.Timestamptz(6)
 
   // Relations
-  wallets               Wallet[]  @relation("UserWallet")
-  received_gifts        Wallet[]  @relation("OtherUserWallet")
-  owned_agencies        Agency[]  @relation("AgencyOwner")
-  managed_agencies      Agency[]  @relation("BDAgency")
+  wallets               Wallet[]               @relation("UserWallet")
+  received_gifts        Wallet[]               @relation("OtherUserWallet")
+  owned_agencies        Agency[]               @relation("AgencyOwner")
+  managed_agencies      Agency[]               @relation("BDAgency")
   posts                 Post[]
   videos                Video[]
   comments              Comment[]
   favorites             Favorite[]
-  followers             Follower[] @relation("FollowerTo")
-  following             Follower[] @relation("FollowerFrom")
-  live_sessions         LiveUser[] @relation("UserLiveSessions")
+  followers             Follower[]             @relation("FollowerTo")
+  following             Follower[]             @relation("FollowerFrom")
+  live_sessions         LiveUser[]             @relation("UserLiveSessions")
   live_history          LiveStreamingHistory[] @relation("UserLiveHistory")
-  generic_invitations   Invitation[] @relation("TargetUserGenericInvites")
+  generic_invitations   Invitation[]           @relation("TargetUserGenericInvites")
 
   @@map("users")
 }
@@ -81,7 +79,7 @@ model Post {
   comment_count Int?      @default(0)
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
 
-  user          User      @relation(fields: [user_id], references: [id])
+  user          User       @relation(fields: [user_id], references: [id])
   comments      Comment[]
   favorites     Favorite[]
 
@@ -149,13 +147,13 @@ model Admin {
 }
 
 model Follower {
-  id           String   @id @default(uuid()) @db.Uuid
-  from_user_id String   @db.Uuid
-  to_user_id   String   @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  from_user_id String    @db.Uuid
+  to_user_id   String    @db.Uuid
   created_at   DateTime? @default(now()) @db.Timestamptz(6)
 
-  from_user    User     @relation("FollowerFrom", fields: [from_user_id], references: [id])
-  to_user      User     @relation("FollowerTo", fields: [to_user_id], references: [id])
+  from_user    User      @relation("FollowerFrom", fields: [from_user_id], references: [id])
+  to_user      User      @relation("FollowerTo", fields: [to_user_id], references: [id])
 
   @@map("followers")
 }
@@ -223,8 +221,8 @@ model Wallet {
   is_income       Boolean?  @default(true)
   date            DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation("UserWallet", fields: [user_id], references: [id])
-  other_user      User?     @relation("OtherUserWallet", fields: [other_user_id], references: [id])
+  user            User?     @relation("UserWallet", fields: [user_id], references: [id], map: "wallet_user_id_rel")
+  other_user      User?     @relation("OtherUserWallet", fields: [other_user_id], references: [id], map: "wallet_other_user_id_rel")
 
   @@map("wallet")
 }
