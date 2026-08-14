@@ -4,6 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -37,7 +39,7 @@ model User {
   // Enterprise fields
   region                String?
   commission            Float?    @default(0)
-  host_status           String?   @default("NONE") // ACTIVE, PENDING, SUSPENDED, NONE
+  host_status           String?   @default("NONE")
   agency_status         String?   @default("NONE")
   bd_id                 String?   @db.Uuid
   bd_leader_id          String?   @db.Uuid
@@ -51,22 +53,81 @@ model User {
   received_gifts        Wallet[]  @relation("OtherUserWallet")
   owned_agencies        Agency[]  @relation("AgencyOwner")
   managed_agencies      Agency[]  @relation("BDAgency")
-
-  bd_invitations_sent   BDInvitation[] @relation("LeaderInvites")
-  bd_invitations_received BDInvitation[] @relation("TargetUserBDInvites")
-
-  agency_invitations_sent AgencyInvitation[] @relation("BDInvites")
-  agency_invitations_received AgencyInvitation[] @relation("TargetUserAgencyInvites")
-
-  generic_invitations   Invitation[] @relation("TargetUserGenericInvites")
-
-  live_history          LiveStreamingHistory[]
-  live_sessions         LiveUser[]
-
+  posts                 Post[]
+  videos                Video[]
+  comments              Comment[]
+  favorites             Favorite[]
   followers             Follower[] @relation("FollowerTo")
   following             Follower[] @relation("FollowerFrom")
+  live_sessions         LiveUser[]
 
   @@map("users")
+}
+
+model Post {
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String    @db.Uuid
+  caption       String?
+  image         String?
+  video         String?
+  thumbnail     String?
+  is_video      Boolean?  @default(false)
+  allow_comment Boolean?  @default(true)
+  show_video    Boolean?  @default(true)
+  is_fake       Boolean?  @default(false)
+  like_count    Int?      @default(0)
+  comment_count Int?      @default(0)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  user          User      @relation(fields: [user_id], references: [id])
+  comments      Comment[]
+  favorites     Favorite[]
+
+  @@map("posts")
+}
+
+model Video {
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String    @db.Uuid
+  caption       String?
+  video_url     String
+  thumbnail     String?
+  like_count    Int?      @default(0)
+  comment_count Int?      @default(0)
+  is_fake       Boolean?  @default(false)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  user          User      @relation(fields: [user_id], references: [id])
+  comments      Comment[]
+
+  @@map("videos")
+}
+
+model Comment {
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String    @db.Uuid
+  post_id       String?   @db.Uuid
+  video_id      String?   @db.Uuid
+  comment       String
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  user          User      @relation(fields: [user_id], references: [id])
+  post          Post?     @relation(fields: [post_id], references: [id])
+  video         Video?    @relation(fields: [video_id], references: [id])
+
+  @@map("comments")
+}
+
+model Favorite {
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String    @db.Uuid
+  post_id       String    @db.Uuid
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  user          User      @relation(fields: [user_id], references: [id])
+  post          Post      @relation(fields: [post_id], references: [id])
+
+  @@map("favorites")
 }
 
 model Admin {
@@ -101,24 +162,15 @@ model Agency {
   id                String    @id @default(uuid()) @db.Uuid
   name              String
   image             String?   @default("")
-  bio               String?   @default("")
   owner_id          String    @db.Uuid
   bd_id             String?   @db.Uuid
-  whatsapp_number   String?
-  country           String?
   code              String?   @unique
-  host_count        Int?      @default(0)
-  active_host_count Int?      @default(0)
-  total_work        BigInt?   @default(0)
   status            Boolean?  @default(true)
   is_deleted        Boolean?  @default(false)
   created_at        DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
 
   owner             User      @relation("AgencyOwner", fields: [owner_id], references: [id])
   bd                User?     @relation("BDAgency", fields: [bd_id], references: [id])
-
-  generic_invitations Invitation[] @relation("AgencyGenericInvites")
 
   @@map("agencies")
 }
@@ -127,16 +179,9 @@ model BDInvitation {
   id              String    @id @default(uuid()) @db.Uuid
   leader_id       String    @db.Uuid
   target_user_id  String    @db.Uuid
-  status          String?   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED, CANCELLED
-  message         String?   @default("Invite to become a Business Developer")
+  status          String?   @default("PENDING")
   expires_at      DateTime  @db.Timestamptz(6)
-  accepted_at     DateTime? @db.Timestamptz(6)
-  declined_at     DateTime? @db.Timestamptz(6)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
-
-  leader          User      @relation("LeaderInvites", fields: [leader_id], references: [id])
-  target_user     User      @relation("TargetUserBDInvites", fields: [target_user_id], references: [id])
 
   @@map("bd_invitations")
 }
@@ -145,16 +190,9 @@ model AgencyInvitation {
   id              String    @id @default(uuid()) @db.Uuid
   bd_id           String    @db.Uuid
   target_user_id  String    @db.Uuid
-  status          String?   @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED, CANCELLED
-  message         String?   @default("Invite to become an Agency")
+  status          String?   @default("PENDING")
   expires_at      DateTime  @db.Timestamptz(6)
-  accepted_at     DateTime? @db.Timestamptz(6)
-  declined_at     DateTime? @db.Timestamptz(6)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
-
-  bd              User      @relation("BDInvites", fields: [bd_id], references: [id])
-  target_user     User      @relation("TargetUserAgencyInvites", fields: [target_user_id], references: [id])
 
   @@map("agency_invitations")
 }
@@ -164,24 +202,11 @@ model Invitation {
   token           String    @unique
   role            String
   user_id         String?   @db.Uuid
-  name            String?
-  contact         String?
-  bd_leader_id    String?   @db.Uuid
-  bd_id           String?   @db.Uuid
-  agency_id       String?   @db.Uuid
-  sender_id       String?
-  sender_role     String?
-  message         String?   @default("")
-  commission      Float?    @default(0)
-  region          String?
   status          String?   @default("PENDING")
   expiry_date     DateTime  @db.Timestamptz(6)
-  accepted_at     DateTime? @db.Timestamptz(6)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
 
   user            User?     @relation("TargetUserGenericInvites", fields: [user_id], references: [id])
-  agency          Agency?   @relation("AgencyGenericInvites", fields: [agency_id], references: [id])
 
   @@map("invitations")
 }
@@ -189,18 +214,14 @@ model Invitation {
 model Wallet {
   id              String    @id @default(uuid()) @db.Uuid
   user_id         String?   @db.Uuid
-  other_user_id   String?   @db.Uuid
-  type            Int?      // 0: live, 1: convert, 2: purchase, 3: call, 4: ad, 5: bonus, 6: referral, 7: withdraw, 8: admin
+  type            Int?
   diamond         BigInt?   @default(0)
   r_coin          BigInt?   @default(0)
   is_income       Boolean?  @default(true)
-  payment_gateway String?
   date            DateTime? @default(now()) @db.Timestamptz(6)
-  reason          String?
-  admin_id        String?
 
   user            User?     @relation("UserWallet", fields: [user_id], references: [id])
-  other_user      User?     @relation("OtherUserWallet", fields: [other_user_id], references: [id])
+  other_user      User?     @relation("OtherUserWallet", fields: [user_id], references: [id])
 
   @@map("wallet")
 }
@@ -208,28 +229,11 @@ model Wallet {
 model LiveUser {
   id              String    @id @default(uuid()) @db.Uuid
   name            String?
-  country         String?
-  image           String?
-  view            Json?     @default("[]")
-  age             Int?
-  seats           Json?     @default("[]")
-  token           String?
   channel         String?
-  r_coin          BigInt?   @default(0)
-  diamond         BigInt?   @default(0)
-  username        String?
-  background      String?
-  is_vip          Boolean?  @default(false)
   live_user_id    String?   @db.Uuid
-  agora_uid       Int?      @default(0)
-  live_history_id String?   @db.Uuid
-  is_public       Boolean?  @default(true)
-  audio           Boolean?  @default(false)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
 
   user            User?     @relation(fields: [live_user_id], references: [id])
-  history         LiveStreamingHistory? @relation(fields: [live_history_id], references: [id])
 
   @@map("live_users")
 }
@@ -237,19 +241,9 @@ model LiveUser {
 model LiveStreamingHistory {
   id              String    @id @default(uuid()) @db.Uuid
   user_id         String?   @db.Uuid
-  duration        String?   @default("00:00:00")
-  user_count      Int?      @default(0)
-  gifts           Int?      @default(0)
-  comments        Int?      @default(0)
-  fans            Int?      @default(0)
-  r_coin          BigInt?   @default(0)
-  start_time      DateTime? @db.Timestamptz(6)
-  end_time        DateTime? @db.Timestamptz(6)
   created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
 
   user            User?     @relation(fields: [user_id], references: [id])
-  live_sessions   LiveUser[]
 
   @@map("live_streaming_history")
 }
@@ -257,15 +251,8 @@ model LiveStreamingHistory {
 model Gift {
   id              String    @id @default(uuid()) @db.Uuid
   name            String?   @default("")
-  image           String?
   coin            Int?
-  type            Int?      @default(0) // 0: image, 1: gif, 2: svga
   category_id     String?   @db.Uuid
-  svga_file       String?
-  is_lucky        Boolean?  @default(false)
-  is_active       Boolean?  @default(true)
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
 
   category        GiftCategory? @relation(fields: [category_id], references: [id])
 
@@ -275,10 +262,6 @@ model Gift {
 model GiftCategory {
   id              String    @id @default(uuid()) @db.Uuid
   name            String?
-  image           String?
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
-
   gifts           Gift[]
 
   @@map("gift_categories")
@@ -286,36 +269,8 @@ model GiftCategory {
 
 model Setting {
   id                      String    @id @default(uuid()) @db.Uuid
-  referral_bonus          Int?      @default(50)
-  login_bonus             Int?      @default(50)
-  agora_key               String?   @default("AGORA KEY")
-  agora_certificate       String?   @default("AGORA CERTIFICATE")
-  max_second_for_video    Int?      @default(30)
-  privacy_policy_link     String?   @default("PRIVACY POLICY LINK")
-  privacy_policy_text     String?   @default("PRIVACY POLICY TEXT")
-  chat_charge             Int?      @default(10)
-  call_charge             Int?      @default(10)
-  google_play_email       String?   @default("GOOGLE PLAY EMAIL")
-  google_play_key         String?   @default("GOOGLE PLAY KEY")
-  google_play_switch      Boolean?  @default(false)
-  stripe_switch           Boolean?  @default(false)
-  stripe_publishable_key  String?   @default("STRIPE PUBLISHABLE KEY")
-  stripe_secret_key       String?   @default("STRIPE SECRET KEY")
-  currency                String?   @default("$")
-  r_coin_for_cash_out     Int?      @default(20)
-  r_coin_for_diamond      Int?      @default(20)
   is_app_active           Boolean?  @default(true)
-  maintenance_message     String?   @default("Server is under maintenance. Please try again later.")
   android_version         String?   @default("1.0.0")
-  android_force_update    Boolean?  @default(false)
-  android_update_link     String?   @default("")
-  ios_version             String?   @default("1.0.0")
-  ios_force_update        Boolean?  @default(false)
-  ios_update_link         String?   @default("")
-  payment_gateway         Json?     @default("[]")
-  min_r_coin_for_cash_out Int?      @default(200)
-  free_diamond_for_ad     Int?      @default(20)
-  max_ad_per_day          Int?      @default(3)
 
   @@map("settings")
 }
