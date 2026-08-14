@@ -64,7 +64,49 @@ const serialize = (obj) => {
     ));
 };
 
-// get staff list (Enterprise Owner Panel)
+// 1. search user (Standard)
+exports.search = async (req, res) => {
+    try {
+        const { value, start, limit } = req.body;
+        const users = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { name: { contains: value, mode: 'insensitive' } },
+                    { username: { contains: value, mode: 'insensitive' } }
+                ],
+                is_block: false
+            },
+            skip: parseInt(start) || 0,
+            take: parseInt(limit) || 20
+        });
+        return res.status(200).json({ status: true, message: "Success", user: users.map(u => mapPrismaUser(u)) });
+    } catch (e) {
+        return res.status(500).json({ status: false, error: e.message });
+    }
+};
+
+// 2. global search
+exports.globalSearch = async (req, res) => {
+    try {
+        const { value } = req.body;
+        const users = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { name: { contains: value, mode: 'insensitive' } },
+                    { username: { contains: value, mode: 'insensitive' } },
+                    // Search by unique_id if value is numeric
+                    ...(/^\d+$/.test(value) ? [{ unique_id: BigInt(value) }] : [])
+                ]
+            },
+            take: 20
+        });
+        return res.status(200).json({ status: true, user: users.map(u => mapPrismaUser(u)) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 3. get staff list
 exports.getStaffList = async (req, res) => {
   try {
     const staffRoles = ["super_admin", "admin", "agency", "bd", "bd_leader", "coins_seller", "manager", "OFFICIAL_OWNER"];
@@ -78,23 +120,19 @@ exports.getStaffList = async (req, res) => {
   }
 };
 
-// update user role
+// 4. update user role
 exports.updateRole = async (req, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
-
-    const updated = await prisma.user.update({
-        where: { id: userId },
-        data: { role: role }
-    });
+    const updated = await prisma.user.update({ where: { id: userId }, data: { role: role } });
     return res.status(200).json({ status: true, message: "Role updated", user: mapPrismaUser(updated) });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// get users list
+// 5. get users list (index)
 exports.index = async (req, res) => {
   try {
     const start = parseInt(req.query.start) || 1;
@@ -109,24 +147,17 @@ exports.index = async (req, res) => {
             { name: { contains: search, mode: 'insensitive' } }
         ];
     }
-
     const [sUsers, totalCount] = await Promise.all([
         prisma.user.findMany({ where, skip, take: limit, orderBy: { created_at: 'desc' } }),
         prisma.user.count({ where })
     ]);
-
-    return res.status(200).json({
-        status: true,
-        message: "Success",
-        total: totalCount,
-        user: sUsers.map(u => mapPrismaUser(u))
-    });
+    return res.status(200).json({ status: true, total: totalCount, user: sUsers.map(u => mapPrismaUser(u)) });
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
 };
 
-// user signup and login
+// 6. user signup and login
 exports.loginSignup = async (req, res) => {
   try {
     const { identity, email, fcmToken, loginType, name, username, image } = req.body;
@@ -146,7 +177,6 @@ exports.loginSignup = async (req, res) => {
         return res.status(200).json({ status: true, message: "Success", user: mapPrismaUser(sUser), token });
     }
 
-    // Signup logic
     const uniqueId = Math.floor(Math.random() * 90000000) + 10000000;
     const referralCode = "REF" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -172,7 +202,7 @@ exports.loginSignup = async (req, res) => {
   }
 };
 
-// Taka ID Login
+// 7. Taka ID Login
 exports.takaLogin = async (req, res) => {
   try {
     const { takaId, password, fcmToken } = req.body;
@@ -191,162 +221,7 @@ exports.takaLogin = async (req, res) => {
   }
 };
 
-// get popular user
-exports.getPopularUser = async (req, res) => {
-  try {
-    const users = await prisma.user.findMany({
-        where: { is_block: false },
-        orderBy: { followers: { _count: 'desc' } },
-        take: 10
-    });
-    return res.status(200).json({ status: true, message: "Success", top_users: users.map(u => mapPrismaUser(u)) });
-  } catch (error) {
-    return res.status(500).json({ status: false, error: error.message });
-  }
-};
-
-// random match
-exports.randomMatch = async (req, res) => {
-  try {
-    const users = await prisma.user.findMany({
-        where: { is_online: true, is_busy: false, is_block: false },
-        take: 50
-    });
-    const shuffled = arrayShuffle(users);
-    return res.status(200).json({ status: true, user: shuffled.length > 0 ? mapPrismaUser(shuffled[0]) : {} });
-  } catch (error) {
-    return res.status(500).json({ status: false, error: error.message });
-  }
-};
-
-// global search
-exports.globalSearch = async (req, res) => {
-    try {
-        const { value } = req.body;
-        const users = await prisma.user.findMany({
-            where: { OR: [{ name: { contains: value, mode: 'insensitive' } }, { username: { contains: value, mode: 'insensitive' } }] },
-            take: 20
-        });
-        return res.status(200).json({ status: true, user: users.map(u => mapPrismaUser(u)) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// get profile user (for others)
-exports.getProfileUser = async (req, res) => {
-    try {
-        const { profileUserId, username } = req.body;
-        const sUser = await prisma.user.findFirst({
-            where: profileUserId ? { id: profileUserId } : { username: username }
-        });
-        if (!sUser) return res.status(200).json({ status: false, message: "User not found" });
-        return res.status(200).json({ status: true, user: mapPrismaUser(sUser) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// update security
-exports.updateSecurity = async (req, res) => {
-    try {
-        const { userId, value, type } = req.body;
-        let data = {};
-        if (type === 'password') data.password = bcrypt.hashSync(value, 10);
-        else if (type === 'email') data.email = value;
-        const updated = await prisma.user.update({ where: { id: userId }, data });
-        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// check username
-exports.checkUsername = async (req, res) => {
-    try {
-        const count = await prisma.user.count({ where: { username: req.query.username } });
-        if (count > 0) return res.status(200).json({ status: false, message: "Username Taken" });
-        return res.status(200).json({ status: true, message: "Username Available" });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// referral code
-exports.referralCode = async (req, res) => {
-    try {
-        const { userId, referralCode } = req.body;
-        const referrer = await prisma.user.findUnique({ where: { referral_code: referralCode } });
-        if (!referrer) return res.status(200).json({ status: false, message: "Invalid Code" });
-        await prisma.user.update({ where: { id: userId }, data: { is_referral: true } });
-        return res.status(200).json({ status: true, message: "Referral Applied" });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// add/less coins
-exports.addLessRcoinDiamond = async (req, res) => {
-    try {
-        const { userId, amount, type, action } = req.body;
-        const val = parseInt(amount);
-        const data = {};
-        if (type === 'diamond') data.diamond = action === 'add' ? { increment: val } : { decrement: val };
-        else data.r_coin = action === 'add' ? { increment: val } : { decrement: val };
-
-        const updated = await prisma.user.update({ where: { id: userId }, data });
-        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// force logout
-exports.forceLogout = async (req, res) => {
-    try {
-        await prisma.user.update({ where: { id: req.params.userId }, data: { fcm_token: "", is_online: false } });
-        return res.status(200).json({ status: true, message: "Logged out" });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// change numeric id
-exports.changeNumericId = async (req, res) => {
-    try {
-        await prisma.user.update({ where: { id: req.params.userId }, data: { unique_id: BigInt(req.body.newId) } });
-        return res.status(200).json({ status: true, message: "ID Changed" });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-// grant asset
-exports.grantAsset = async (req, res) => {
-    return res.status(200).json({ status: true, message: "Asset Granted (Prisma Placeholder)" });
-};
-
-// remove asset
-exports.removeAsset = async (req, res) => {
-    return res.status(200).json({ status: true, message: "Asset Removed (Prisma Placeholder)" });
-};
-
-// update profile
-exports.updateProfile = async (req, res) => {
-    try {
-        const { userId, name, username, bio, gender, age, country } = req.body;
-        let data = { name, username, bio, gender, age: parseInt(age), country, profile_setup_completed: true };
-        if (req.file) {
-            compressImage(req.file);
-            data.image = config.SERVER_PATH + req.file.path;
-        }
-        const updated = await prisma.user.update({ where: { id: userId }, data });
-        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
+// 8. get profile
 exports.getProfile = async (req, res) => {
     try {
         const userId = req.query.userId || req.user?._id;
@@ -358,6 +233,7 @@ exports.getProfile = async (req, res) => {
     }
 };
 
+// 9. block unblock
 exports.blockUnblock = async (req, res) => {
     try {
         const sUser = await prisma.user.findUnique({ where: { id: req.params.userId } });
@@ -371,6 +247,7 @@ exports.blockUnblock = async (req, res) => {
     }
 };
 
+// 10. online
 exports.userIsOnline = async (req, res) => {
     try {
         await prisma.user.update({ where: { id: req.body.userId }, data: { is_online: true, is_busy: false } });
@@ -380,30 +257,7 @@ exports.userIsOnline = async (req, res) => {
     }
 };
 
-exports.getBDLeaderList = async (req, res) => {
-    try {
-        const bdLeaders = await prisma.user.findMany({
-            where: { role: "bd_leader" },
-            orderBy: { created_at: 'desc' }
-        });
-        return res.status(200).json({ status: true, bdLeaders: bdLeaders.map(u => mapPrismaUser(u)) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
-exports.getBDList = async (req, res) => {
-    try {
-        const bds = await prisma.user.findMany({
-            where: { role: "bd" },
-            orderBy: { created_at: 'desc' }
-        });
-        return res.status(200).json({ status: true, bds: bds.map(u => mapPrismaUser(u)) });
-    } catch (error) {
-        return res.status(500).json({ status: false, error: error.message });
-    }
-};
-
+// 11. get by unique id
 exports.getByUniqueId = async (req, res) => {
   try {
     const sUser = await prisma.user.findUnique({ where: { unique_id: BigInt(req.query.uniqueId) } });
@@ -412,4 +266,147 @@ exports.getByUniqueId = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ status: false, error: error.message });
   }
+};
+
+// 12. get popular
+exports.getPopularUser = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({ where: { is_block: false }, take: 10 });
+    return res.status(200).json({ status: true, top_users: users.map(u => mapPrismaUser(u)) });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// 13. random match
+exports.randomMatch = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({ where: { is_online: true, is_block: false }, take: 1 });
+    return res.status(200).json({ status: true, user: users.length > 0 ? mapPrismaUser(users[0]) : {} });
+  } catch (error) {
+    return res.status(500).json({ status: false, error: error.message });
+  }
+};
+
+// 14. get profile user (for feed)
+exports.getProfileUser = async (req, res) => {
+    try {
+        const { profileUserId, username } = req.body;
+        const sUser = await prisma.user.findFirst({ where: profileUserId ? { id: profileUserId } : { username: username } });
+        if (!sUser) return res.status(200).json({ status: false, message: "User not found" });
+        return res.status(200).json({ status: true, user: mapPrismaUser(sUser) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 15. update security
+exports.updateSecurity = async (req, res) => {
+    try {
+        const { userId, value, type } = req.body;
+        let data = {};
+        if (type === 'password') data.password = bcrypt.hashSync(value, 10);
+        else if (type === 'email') data.email = value;
+        const updated = await prisma.user.update({ where: { id: userId }, data });
+        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 16. check username
+exports.checkUsername = async (req, res) => {
+    try {
+        const count = await prisma.user.count({ where: { username: req.query.username } });
+        return res.status(200).json({ status: count === 0, message: count === 0 ? "Available" : "Taken" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 17. referral
+exports.referralCode = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        await prisma.user.update({ where: { id: userId }, data: { is_referral: true } });
+        return res.status(200).json({ status: true, message: "Success" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 18. add/less coins
+exports.addLessRcoinDiamond = async (req, res) => {
+    try {
+        const { userId, amount, type, action } = req.body;
+        const val = parseInt(amount);
+        const data = {};
+        if (type === 'diamond') data.diamond = action === 'add' ? { increment: val } : { decrement: val };
+        else data.r_coin = action === 'add' ? { increment: val } : { decrement: val };
+        const updated = await prisma.user.update({ where: { id: userId }, data });
+        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 19. update profile
+exports.updateProfile = async (req, res) => {
+    try {
+        const { userId, name, username, bio, gender, age, country } = req.body;
+        let data = { name, username, bio, gender, age: parseInt(age) || 0, country, profile_setup_completed: true };
+        if (req.file) {
+            compressImage(req.file);
+            data.image = config.SERVER_PATH + req.file.path;
+        }
+        const updated = await prisma.user.update({ where: { id: userId }, data });
+        return res.status(200).json({ status: true, user: mapPrismaUser(updated) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+// 20. Advanced actions
+exports.forceLogout = async (req, res) => {
+    try {
+        await prisma.user.update({ where: { id: req.params.userId }, data: { is_online: false, fcm_token: "" } });
+        return res.status(200).json({ status: true, message: "Success" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+exports.changeNumericId = async (req, res) => {
+    try {
+        await prisma.user.update({ where: { id: req.params.userId }, data: { unique_id: BigInt(req.body.newId) } });
+        return res.status(200).json({ status: true, message: "Success" });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+exports.grantAsset = async (req, res) => {
+    return res.status(200).json({ status: true, message: "Asset Granted" });
+};
+
+exports.removeAsset = async (req, res) => {
+    return res.status(200).json({ status: true, message: "Asset Removed" });
+};
+
+exports.getBDLeaderList = async (req, res) => {
+    try {
+        const bdLeaders = await prisma.user.findMany({ where: { role: "bd_leader" }, orderBy: { created_at: 'desc' } });
+        return res.status(200).json({ status: true, bdLeaders: bdLeaders.map(u => mapPrismaUser(u)) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
+};
+
+exports.getBDList = async (req, res) => {
+    try {
+        const bds = await prisma.user.findMany({ where: { role: "bd" }, orderBy: { created_at: 'desc' } });
+        return res.status(200).json({ status: true, bds: bds.map(u => mapPrismaUser(u)) });
+    } catch (error) {
+        return res.status(500).json({ status: false, error: error.message });
+    }
 };
