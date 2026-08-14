@@ -3,14 +3,14 @@ module.exports = {
   PORT: process.env.PORT || 5000,
 
   //secret key for API
-  SECRET_KEY: process.env.SECRET_KEY || "",
+  SECRET_KEY: process.env.SECRET_KEY || "BS67Rfb0Tf",
 
   //gmail credentials for send email
   EMAIL: process.env.EMAIL || "",
   PASSWORD: process.env.PASSWORD || "",
 
   //secret key for jwt
-  JWT_SECRET: process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_2026",
+  JWT_SECRET: process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_587385",
 
   SERVER_PATH: process.env.SERVER_PATH || "",
 

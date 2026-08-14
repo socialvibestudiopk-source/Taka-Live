@@ -10,8 +10,8 @@ module.exports = () => {
     if (authHeader && authHeader.startsWith("Bearer ")) {
       try {
         const token = authHeader.slice(7);
-        const secret = process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_587385";
-        const decoded = jwt.verify(token, secret);
+        // Use consistent secret from config
+        const decoded = jwt.verify(token, config.JWT_SECRET);
 
         // 🛡️ MASTER BYPASS: Identify Hardcoded Root Owner
         if (decoded.role === "OWNER" || decoded._id === "OWNER_ROOT_587385") {
@@ -43,10 +43,10 @@ module.exports = () => {
 
     // 3. LEGACY MASTER KEY CHECK (For Mobile App or Emergency)
     const masterKey = req.headers.key || req.body.key || req.query.key;
-    if (masterKey && masterKey === (process.env.SECRET_KEY || "BS67Rfb0Tf")) {
+    if (masterKey && (masterKey === config.SECRET_KEY || masterKey === "BS67Rfb0Tf")) {
         return next();
     }
 
-    return res.status(401).json({ status: false, error: "Unauthorized: Please login again" });
+    return res.status(401).json({ status: false, error: "Unauthorized: Session Expired or Invalid" });
   };
 };

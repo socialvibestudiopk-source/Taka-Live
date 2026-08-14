@@ -20,7 +20,8 @@ exports.login = async (req, res) => {
             email: email,
             role: "OWNER"
         };
-        const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "48h" });
+        // Set expiry to 30 days to avoid frequent logouts
+        const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "30d" });
 
         // Auto-ensure Owner exists in Supabase for relations
         try {
@@ -58,7 +59,7 @@ exports.login = async (req, res) => {
                     email: sAdmin.email,
                     role: sAdmin.role
                 };
-                const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "24h" });
+                const token = jwt.sign(payload, config.JWT_SECRET, { expiresIn: "30d" });
                 return res.status(200).json({ status: true, message: "Manager Login Success!!", token, admin: payload });
             }
         }

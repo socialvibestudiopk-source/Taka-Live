@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const prisma = require("../../prisma");
+const config = require("../../config");
 
 module.exports = async (req, res, next) => {
   try {
@@ -7,10 +8,9 @@ module.exports = async (req, res, next) => {
     if (!authHeader) return res.status(403).json({ status: false, message: "No Authorization Header" });
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-    const secret = process.env.JWT_SECRET || "TAKAlive_JWT_Secret_Key_587385";
 
     try {
-        const decoded = jwt.verify(token, secret);
+        const decoded = jwt.verify(token, config.JWT_SECRET);
 
         // Root Owner Bypass
         if (decoded.role === "OWNER" || decoded._id === "OWNER_ROOT_587385") {
