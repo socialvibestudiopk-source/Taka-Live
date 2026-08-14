@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -7,59 +8,59 @@ datasource db {
 }
 
 model User {
-  id                    String    @id @default(uuid()) @db.Uuid
-  unique_id             BigInt?   @unique
-  name                  String?   @default("")
-  username              String?   @unique
-  email                 String?   @unique
-  password              String?
-  image                 String?   @default("")
-  role                  String?   @default("user")
-  gender                String?   @default("")
-  age                   Int?      @default(0)
-  country               String?
-  ip                    String?
-  identity              String?
-  fcm_token             String?
-  last_login            DateTime? @db.Timestamptz(6)
-  is_online             Boolean?  @default(false)
-  is_busy               Boolean?  @default(false)
-  is_fake               Boolean?  @default(false)
-  is_block              Boolean?  @default(false)
-  referral_code         String?   @unique
-  referral_count        Int?      @default(0)
-  diamond               BigInt?   @default(0)
-  r_coin                BigInt?   @default(0)
-  spent_coin            BigInt?   @default(0)
-  is_vip                Boolean?  @default(false)
-  profile_setup_completed Boolean? @default(false)
+  id                      String    @id @default(uuid()) @db.Uuid
+  unique_id               BigInt?   @unique
+  name                    String?   @default("")
+  username                String?   @unique
+  email                   String?   @unique
+  password                String?
+  image                   String?   @default("")
+  role                    String?   @default("user")
+  gender                  String?   @default("")
+  age                     Int?      @default(0)
+  country                 String?
+  ip                      String?
+  identity                String?
+  fcm_token               String?
+  last_login              DateTime? @db.Timestamptz(6)
+  is_online               Boolean?  @default(false)
+  is_busy                 Boolean?  @default(false)
+  is_fake                 Boolean?  @default(false)
+  is_block                Boolean?  @default(false)
+  referral_code           String?   @unique
+  referral_count          Int?      @default(0)
+  diamond                 BigInt?   @default(0)
+  r_coin                  BigInt?   @default(0)
+  spent_coin              BigInt?   @default(0)
+  is_vip                  Boolean?  @default(false)
+  profile_setup_completed Boolean?  @default(false)
 
   // Enterprise fields
-  region                String?
-  commission            Float?    @default(0)
-  host_status           String?   @default("NONE")
-  agency_status         String?   @default("NONE")
-  bd_id                 String?   @db.Uuid
-  bd_leader_id          String?   @db.Uuid
-  agency_id             String?   @db.Uuid
+  region        String?
+  commission    Float?  @default(0)
+  host_status   String? @default("NONE")
+  agency_status String? @default("NONE")
+  bd_id         String? @db.Uuid
+  bd_leader_id  String? @db.Uuid
+  agency_id     String? @db.Uuid
 
-  created_at            DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime? @default(now()) @db.Timestamptz(6)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
 
   // Relations
-  wallets               Wallet[]               @relation("UserWallet")
-  received_gifts        Wallet[]               @relation("OtherUserWallet")
-  owned_agencies        Agency[]               @relation("AgencyOwner")
-  managed_agencies      Agency[]               @relation("BDAgency")
-  posts                 Post[]
-  videos                Video[]
-  comments              Comment[]
-  favorites             Favorite[]
-  followers             Follower[]             @relation("FollowerTo")
-  following             Follower[]             @relation("FollowerFrom")
-  live_sessions         LiveUser[]             @relation("UserLiveSessions")
-  live_history          LiveStreamingHistory[] @relation("UserLiveHistory")
-  generic_invitations   Invitation[]           @relation("TargetUserGenericInvites")
+  wallets             Wallet[]               @relation("UserWallet")
+  received_gifts      Wallet[]               @relation("OtherUserWallet")
+  owned_agencies      Agency[]               @relation("AgencyOwner")
+  managed_agencies    Agency[]               @relation("BDAgency")
+  posts               Post[]
+  videos              Video[]
+  comments            Comment[]
+  favorites           Favorite[]
+  followers           Follower[]             @relation("FollowerTo")
+  following           Follower[]             @relation("FollowerFrom")
+  live_sessions       LiveUser[]             @relation("UserLiveSessions")
+  live_history        LiveStreamingHistory[] @relation("UserLiveHistory")
+  generic_invitations Invitation[]           @relation("TargetUserGenericInvites")
 
   @@map("users")
 }
@@ -79,9 +80,9 @@ model Post {
   comment_count Int?      @default(0)
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
 
-  user          User       @relation(fields: [user_id], references: [id])
-  comments      Comment[]
-  favorites     Favorite[]
+  user      User       @relation(fields: [user_id], references: [id])
+  comments  Comment[]
+  favorites Favorite[]
 
   @@map("posts")
 }
@@ -97,35 +98,35 @@ model Video {
   is_fake       Boolean?  @default(false)
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
 
-  user          User      @relation(fields: [user_id], references: [id])
-  comments      Comment[]
+  user     User      @relation(fields: [user_id], references: [id])
+  comments Comment[]
 
   @@map("videos")
 }
 
 model Comment {
-  id            String    @id @default(uuid()) @db.Uuid
-  user_id       String    @db.Uuid
-  post_id       String?   @db.Uuid
-  video_id      String?   @db.Uuid
-  comment       String
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  post_id    String?   @db.Uuid
+  video_id   String?   @db.Uuid
+  comment    String
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
 
-  user          User      @relation(fields: [user_id], references: [id])
-  post          Post?     @relation(fields: [post_id], references: [id])
-  video         Video?    @relation(fields: [video_id], references: [id])
+  user  User   @relation(fields: [user_id], references: [id])
+  post  Post?  @relation(fields: [post_id], references: [id])
+  video Video? @relation(fields: [video_id], references: [id])
 
   @@map("comments")
 }
 
 model Favorite {
-  id            String    @id @default(uuid()) @db.Uuid
-  user_id       String    @db.Uuid
-  post_id       String    @db.Uuid
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  post_id    String    @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
 
-  user          User      @relation(fields: [user_id], references: [id])
-  post          Post      @relation(fields: [post_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
+  post Post @relation(fields: [post_id], references: [id])
 
   @@map("favorites")
 }
@@ -152,126 +153,126 @@ model Follower {
   to_user_id   String    @db.Uuid
   created_at   DateTime? @default(now()) @db.Timestamptz(6)
 
-  from_user    User      @relation("FollowerFrom", fields: [from_user_id], references: [id])
-  to_user      User      @relation("FollowerTo", fields: [to_user_id], references: [id])
+  from_user User @relation("FollowerFrom", fields: [from_user_id], references: [id])
+  to_user   User @relation("FollowerTo", fields: [to_user_id], references: [id])
 
   @@map("followers")
 }
 
 model Agency {
-  id                String    @id @default(uuid()) @db.Uuid
-  name              String
-  image             String?   @default("")
-  owner_id          String    @db.Uuid
-  bd_id             String?   @db.Uuid
-  code              String?   @unique
-  status            Boolean?  @default(true)
-  is_deleted        Boolean?  @default(false)
-  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  image      String?   @default("")
+  owner_id   String    @db.Uuid
+  bd_id      String?   @db.Uuid
+  code       String?   @unique
+  status     Boolean?  @default(true)
+  is_deleted Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
 
-  owner             User      @relation("AgencyOwner", fields: [owner_id], references: [id])
-  bd                User?     @relation("BDAgency", fields: [bd_id], references: [id])
+  owner User  @relation("AgencyOwner", fields: [owner_id], references: [id])
+  bd    User? @relation("BDAgency", fields: [bd_id], references: [id])
 
   @@map("agencies")
 }
 
 model BDInvitation {
-  id              String    @id @default(uuid()) @db.Uuid
-  leader_id       String    @db.Uuid
-  target_user_id  String    @db.Uuid
-  status          String?   @default("PENDING")
-  expires_at      DateTime  @db.Timestamptz(6)
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  leader_id      String    @db.Uuid
+  target_user_id String    @db.Uuid
+  status         String?   @default("PENDING")
+  expires_at     DateTime  @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
 
   @@map("bd_invitations")
 }
 
 model AgencyInvitation {
-  id              String    @id @default(uuid()) @db.Uuid
-  bd_id           String    @db.Uuid
-  target_user_id  String    @db.Uuid
-  status          String?   @default("PENDING")
-  expires_at      DateTime  @db.Timestamptz(6)
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  bd_id          String    @db.Uuid
+  target_user_id String    @db.Uuid
+  status         String?   @default("PENDING")
+  expires_at     DateTime  @db.Timestamptz(6)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
 
   @@map("agency_invitations")
 }
 
 model Invitation {
-  id              String    @id @default(uuid()) @db.Uuid
-  token           String    @unique
-  role            String
-  user_id         String?   @db.Uuid
-  status          String?   @default("PENDING")
-  expiry_date     DateTime  @db.Timestamptz(6)
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  token       String    @unique
+  role        String
+  user_id     String?   @db.Uuid
+  status      String?   @default("PENDING")
+  expiry_date DateTime  @db.Timestamptz(6)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation("TargetUserGenericInvites", fields: [user_id], references: [id])
+  user User? @relation("TargetUserGenericInvites", fields: [user_id], references: [id])
 
   @@map("invitations")
 }
 
 model Wallet {
-  id              String    @id @default(uuid()) @db.Uuid
-  user_id         String?   @db.Uuid
-  other_user_id   String?   @db.Uuid
-  type            Int?
-  diamond         BigInt?   @default(0)
-  r_coin          BigInt?   @default(0)
-  is_income       Boolean?  @default(true)
-  date            DateTime? @default(now()) @db.Timestamptz(6)
+  id            String    @id @default(uuid()) @db.Uuid
+  user_id       String?   @db.Uuid
+  other_user_id String?   @db.Uuid
+  type          Int?
+  diamond       BigInt?   @default(0)
+  r_coin        BigInt?   @default(0)
+  is_income     Boolean?  @default(true)
+  date          DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation("UserWallet", fields: [user_id], references: [id], map: "wallet_user_id_rel")
-  other_user      User?     @relation("OtherUserWallet", fields: [other_user_id], references: [id], map: "wallet_other_user_id_rel")
+  user       User? @relation("UserWallet", fields: [user_id], references: [id], map: "wallet_user_id_rel")
+  other_user User? @relation("OtherUserWallet", fields: [other_user_id], references: [id], map: "wallet_other_user_id_rel")
 
   @@map("wallet")
 }
 
 model LiveUser {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String?
-  channel         String?
-  live_user_id    String?   @db.Uuid
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String?
+  channel      String?
+  live_user_id String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation("UserLiveSessions", fields: [live_user_id], references: [id])
+  user User? @relation("UserLiveSessions", fields: [live_user_id], references: [id])
 
   @@map("live_users")
 }
 
 model LiveStreamingHistory {
-  id              String    @id @default(uuid()) @db.Uuid
-  user_id         String?   @db.Uuid
-  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
 
-  user            User?     @relation("UserLiveHistory", fields: [user_id], references: [id])
+  user User? @relation("UserLiveHistory", fields: [user_id], references: [id])
 
   @@map("live_streaming_history")
 }
 
 model Gift {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String?   @default("")
-  coin            Int?
-  category_id     String?   @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String? @default("")
+  coin        Int?
+  category_id String? @db.Uuid
 
-  category        GiftCategory? @relation(fields: [category_id], references: [id])
+  category GiftCategory? @relation(fields: [category_id], references: [id])
 
   @@map("gifts")
 }
 
 model GiftCategory {
-  id              String    @id @default(uuid()) @db.Uuid
-  name            String?
-  gifts           Gift[]
+  id    String  @id @default(uuid()) @db.Uuid
+  name  String?
+  gifts Gift[]
 
   @@map("gift_categories")
 }
 
 model Setting {
-  id                      String    @id @default(uuid()) @db.Uuid
-  is_app_active           Boolean?  @default(true)
-  android_version         String?   @default("1.0.0")
+  id              String   @id @default(uuid()) @db.Uuid
+  is_app_active   Boolean? @default(true)
+  android_version String?  @default("1.0.0")
 
   @@map("settings")
 }
